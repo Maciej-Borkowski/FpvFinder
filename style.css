@@ -26,9 +26,34 @@ html, body {
   box-sizing: border-box;
 }
 
+#side header { position: relative; }
 #side header h1 {
   margin: 0;
   font-size: 18px;
+}
+
+.lang-switch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+}
+.lang-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #555;
+}
+.lang-btn:hover { background: #eef; }
+.lang-btn.active {
+  background: #4363d8;
+  color: white;
+  border-color: #4363d8;
 }
 #side header .sub {
   color: #555;
