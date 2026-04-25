@@ -14,6 +14,7 @@
 
   const els = {
     folder: document.getElementById("folder-input"),
+    single: document.getElementById("single-input"),
     reset: document.getElementById("reset-btn"),
     status: document.getElementById("status"),
     progress: document.getElementById("progress"),
@@ -31,6 +32,12 @@
     bRun: document.getElementById("b-run"),
     bClear: document.getElementById("b-clear"),
     bResult: document.getElementById("b-result"),
+    modal: document.getElementById("folder-modal"),
+    modalCount: document.getElementById("modal-count"),
+    areaBar: document.getElementById("area-bar"),
+    areaConfirm: document.getElementById("area-confirm"),
+    areaRedraw: document.getElementById("area-redraw"),
+    areaCancel: document.getElementById("area-cancel"),
   };
 
   // ---- Mapa ------------------------------------------------------------------
@@ -43,6 +50,7 @@
 
   const trackLayer = L.layerGroup().addTo(map);
   const ballisticsLayer = L.layerGroup().addTo(map);
+  const bboxLayer = L.layerGroup().addTo(map);
 
   let allBoundsLatLngs = [];
   let trackCount = 0;
@@ -136,8 +144,15 @@
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
 
-  async function processFolder(fileList) {
+  function inBbox(p, bbox) {
+    if (!bbox) return true;
+    return p.lat >= bbox.south && p.lat <= bbox.north
+        && p.lon >= bbox.west && p.lon <= bbox.east;
+  }
+
+  async function processFolder(fileList, bbox) {
     resetMap();
+    if (bbox) drawBboxOverlay(bbox);
 
     const csvFiles = Array.from(fileList).filter(isCsvFile);
     if (csvFiles.length === 0) {
@@ -154,41 +169,53 @@
     els.progress.hidden = false;
     els.progress.max = csvFiles.length;
     els.progress.value = 0;
-    els.status.textContent = `Parsuję ${csvFiles.length} plików…`;
+    const scope = bbox ? "w zaznaczonym obszarze" : "wszystkie";
+    els.status.textContent = `Parsuję ${csvFiles.length} plików (${scope})…`;
 
     let filesWithGps = 0;
     let totalPoints = 0;
     let trackIndex = 0;
+    let filesSkippedBbox = 0;
 
     for (let i = 0; i < csvFiles.length; i++) {
       const f = csvFiles[i];
       const display = f.webkitRelativePath || f.name;
       try {
-        const pts = await FpvParser.parseLogFile(f);
+        let pts = await FpvParser.parseLogFile(f);
+        if (bbox) pts = pts.filter((p) => inBbox(p, bbox));
         if (pts.length > 0) {
           const color = PALETTE[trackIndex % PALETTE.length];
           trackIndex++;
           renderTrack(display, color, pts);
           filesWithGps++;
           totalPoints += pts.length;
+        } else if (bbox) {
+          filesSkippedBbox++;
         }
       } catch (e) {
         console.warn("Błąd przy " + display, e);
       }
       els.progress.value = i + 1;
-      els.status.textContent = `Przetworzono ${i + 1}/${csvFiles.length}. Plików z GPS: ${filesWithGps}, punktów: ${totalPoints}.`;
+      const skipNote = filesSkippedBbox > 0 ? `, poza obszarem: ${filesSkippedBbox}` : "";
+      els.status.textContent = `Przetworzono ${i + 1}/${csvFiles.length}. Plików z GPS: ${filesWithGps}, punktów: ${totalPoints}${skipNote}.`;
       await nextFrame();
     }
 
-    els.status.textContent = filesWithGps === 0
-      ? `Sprawdzono ${csvFiles.length} plików — żaden nie zawierał poprawnych koordynat GPS.`
-      : `Gotowe: ${filesWithGps} plików z GPS, łącznie ${totalPoints} punktów (z ${csvFiles.length} plików).`;
+    if (filesWithGps === 0) {
+      els.status.textContent = bbox
+        ? `Żaden z ${csvFiles.length} plików nie zawiera punktów w zaznaczonym obszarze.`
+        : `Sprawdzono ${csvFiles.length} plików — żaden nie zawierał poprawnych koordynat GPS.`;
+    } else {
+      const skipNote = filesSkippedBbox > 0 ? ` (pominięto ${filesSkippedBbox} plików spoza obszaru)` : "";
+      els.status.textContent = `Gotowe: ${filesWithGps} plików z GPS, łącznie ${totalPoints} punktów${skipNote}.`;
+    }
     els.progress.hidden = true;
   }
 
   function resetMap() {
     trackLayer.clearLayers();
     ballisticsLayer.clearLayers();
+    bboxLayer.clearLayers();
     allBoundsLatLngs = [];
     trackCount = 0;
     els.fileList.innerHTML = "";
@@ -196,16 +223,183 @@
     els.bResult.innerHTML = "";
   }
 
+  // ---- Modal po wyborze folderu ----------------------------------------------
+
+  let pendingFiles = null;
+
+  function countCsv(files) {
+    return Array.from(files).filter(isCsvFile).length;
+  }
+
+  function showModal(count) {
+    els.modalCount.textContent = String(count);
+    els.modal.hidden = false;
+  }
+  function hideModal() {
+    els.modal.hidden = true;
+  }
+
   els.folder.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      processFolder(e.target.files);
+    if (!e.target.files || e.target.files.length === 0) return;
+    pendingFiles = e.target.files;
+    const n = countCsv(pendingFiles);
+    if (n === 0) {
+      els.status.textContent = "W tym folderze nie ma plików .csv.";
+      pendingFiles = null;
+      return;
+    }
+    showModal(n);
+  });
+
+  els.single.addEventListener("change", (e) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    pendingFiles = e.target.files;
+    if (countCsv(pendingFiles) === 0) {
+      els.status.textContent = "Wybrany plik nie jest .csv.";
+      pendingFiles = null;
+      return;
+    }
+    showModal(1);
+  });
+
+  els.modal.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modal-action]");
+    if (!btn) return;
+    const action = btn.dataset.modalAction;
+    hideModal();
+    if (action === "all") {
+      processFolder(pendingFiles, null);
+      pendingFiles = null;
+    } else if (action === "area") {
+      enterDrawMode();
+    } else {
+      pendingFiles = null;
+      els.folder.value = "";
+      els.single.value = "";
     }
   });
 
+  // ---- Rysowanie prostokąta na mapie -----------------------------------------
+
+  let drawState = null;
+  let lastBbox = null;
+
+  function drawBboxOverlay(bbox) {
+    bboxLayer.clearLayers();
+    L.rectangle(
+      [[bbox.south, bbox.west], [bbox.north, bbox.east]],
+      { color: "#3cb44b", weight: 2, fillOpacity: 0.05, dashArray: "4,4" }
+    ).addTo(bboxLayer);
+  }
+
+  function enterDrawMode() {
+    els.areaBar.hidden = false;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
+    lastBbox = null;
+    bboxLayer.clearLayers();
+    document.body.classList.add("draw-mode");
+    map.getContainer().classList.add("draw-mode");
+    map.dragging.disable();
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+
+    map.on("mousedown", onDrawStart);
+    map.on("touchstart", onDrawStart);
+  }
+
+  function exitDrawMode() {
+    els.areaBar.hidden = true;
+    document.body.classList.remove("draw-mode");
+    map.getContainer().classList.remove("draw-mode");
+    map.dragging.enable();
+    map.doubleClickZoom.enable();
+    map.boxZoom.enable();
+    map.off("mousedown", onDrawStart);
+    map.off("touchstart", onDrawStart);
+    map.off("mousemove", onDrawMove);
+    map.off("mouseup", onDrawEnd);
+    drawState = null;
+  }
+
+  function onDrawStart(e) {
+    if (e.originalEvent && e.originalEvent.preventDefault) e.originalEvent.preventDefault();
+    drawState = { start: e.latlng, rect: null };
+    map.on("mousemove", onDrawMove);
+    map.on("mouseup", onDrawEnd);
+    map.on("touchmove", onDrawMove);
+    map.on("touchend", onDrawEnd);
+  }
+
+  function onDrawMove(e) {
+    if (!drawState) return;
+    if (drawState.rect) drawState.rect.remove();
+    drawState.rect = L.rectangle(
+      [drawState.start, e.latlng],
+      { color: "#3cb44b", weight: 2, fillOpacity: 0.1 }
+    ).addTo(bboxLayer);
+  }
+
+  function onDrawEnd(e) {
+    if (!drawState) return;
+    map.off("mousemove", onDrawMove);
+    map.off("mouseup", onDrawEnd);
+    map.off("touchmove", onDrawMove);
+    map.off("touchend", onDrawEnd);
+    const end = e.latlng || drawState.start;
+    const a = drawState.start;
+    const b = end;
+    if (a.lat === b.lat || a.lng === b.lng) {
+      // zbyt mały prostokąt — anuluj rysowanie tej próby
+      if (drawState.rect) drawState.rect.remove();
+      drawState = null;
+      return;
+    }
+    lastBbox = {
+      south: Math.min(a.lat, b.lat),
+      north: Math.max(a.lat, b.lat),
+      west: Math.min(a.lng, b.lng),
+      east: Math.max(a.lng, b.lng),
+    };
+    drawState = null;
+    els.areaConfirm.disabled = false;
+    els.areaRedraw.disabled = false;
+  }
+
+  els.areaConfirm.addEventListener("click", () => {
+    if (!lastBbox || !pendingFiles) return;
+    const bbox = lastBbox;
+    const files = pendingFiles;
+    pendingFiles = null;
+    exitDrawMode();
+    processFolder(files, bbox);
+  });
+
+  els.areaRedraw.addEventListener("click", () => {
+    bboxLayer.clearLayers();
+    lastBbox = null;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
+    // ponownie nasłuchujemy mousedown
+    map.on("mousedown", onDrawStart);
+    map.on("touchstart", onDrawStart);
+  });
+
+  els.areaCancel.addEventListener("click", () => {
+    exitDrawMode();
+    bboxLayer.clearLayers();
+    pendingFiles = null;
+    els.folder.value = "";
+    els.status.textContent = "Anulowano. Wybierz folder z logami EdgeTX (.csv).";
+  });
+
   els.reset.addEventListener("click", () => {
+    if (!els.areaBar.hidden) exitDrawMode();
     resetMap();
     els.folder.value = "";
-    els.status.textContent = "Wybierz folder z logami EdgeTX (.csv).";
+    els.single.value = "";
+    pendingFiles = null;
+    els.status.textContent = "Wybierz folder lub pojedynczy log .csv.";
   });
 
   // ---- Zakładki --------------------------------------------------------------
