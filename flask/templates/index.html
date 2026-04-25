@@ -24,7 +24,7 @@
 
   <section class="tab-pane active" data-pane="map">
     <div class="picker">
-      <input id="path-input" type="text" placeholder="Wpisz lub wklej ścieżkę do folderu z logami…">
+      <input id="path-input" type="text" placeholder="Ścieżka do folderu z logami albo do pojedynczego pliku .csv">
       <button id="browse-btn" class="btn-secondary" title="Przeglądaj foldery">…</button>
     </div>
     <div class="picker">
@@ -35,7 +35,7 @@
 
     <div id="browser" class="browser" hidden></div>
 
-    <div id="status" class="status">Wpisz ścieżkę do folderu z logami i kliknij „Analizuj".</div>
+    <div id="status" class="status">Wpisz ścieżkę do folderu albo pojedynczego pliku .csv i kliknij „Analizuj".</div>
     <progress id="progress" max="1" value="0" hidden></progress>
 
     <div class="legend">
@@ -66,6 +66,28 @@
     <div id="b-result" class="result" hidden></div>
   </section>
 </aside>
+
+<!-- Modal: co zrobić po wpisaniu ścieżki -->
+<div id="folder-modal" class="modal" hidden>
+  <div class="modal-box">
+    <h2>Folder gotowy do analizy</h2>
+    <p class="modal-q">Wczytać wszystkie pliki czy zaznaczyć obszar na mapie?</p>
+    <div class="modal-actions">
+      <button class="btn-primary" data-modal-action="all">Wczytaj wszystkie</button>
+      <button class="btn-secondary" data-modal-action="area">Wybierz obszar na mapie</button>
+      <button class="btn-secondary" data-modal-action="cancel">Anuluj</button>
+    </div>
+    <p class="modal-hint">Wybór obszaru: serwer pominie pliki bez ani jednego punktu w prostokącie. Przydatne gdy jest dużo logów ale wiesz mniej‑więcej gdzie szukać.</p>
+  </div>
+</div>
+
+<!-- Pasek rysowania prostokąta -->
+<div id="area-bar" hidden>
+  <span class="area-instr">Kliknij i przeciągnij prostokąt na mapie ↓</span>
+  <button id="area-confirm" class="btn-primary" disabled>Analizuj zaznaczony obszar</button>
+  <button id="area-redraw" class="btn-secondary" disabled>Narysuj ponownie</button>
+  <button id="area-cancel" class="btn-secondary">Anuluj</button>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>

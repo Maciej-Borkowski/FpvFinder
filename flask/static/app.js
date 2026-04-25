@@ -28,6 +28,11 @@
     bRun: document.getElementById("b-run"),
     bClear: document.getElementById("b-clear"),
     bResult: document.getElementById("b-result"),
+    modal: document.getElementById("folder-modal"),
+    areaBar: document.getElementById("area-bar"),
+    areaConfirm: document.getElementById("area-confirm"),
+    areaRedraw: document.getElementById("area-redraw"),
+    areaCancel: document.getElementById("area-cancel"),
   };
 
   const map = L.map("map").setView([52.0, 19.0], 6);
@@ -38,8 +43,12 @@
 
   const trackLayer = L.layerGroup().addTo(map);
   const ballisticsLayer = L.layerGroup().addTo(map);
+  const bboxLayer = L.layerGroup().addTo(map);
   let allBoundsLatLngs = [];
   let currentSource = null;
+  let pendingPath = null;
+  let lastBbox = null;
+  let drawState = null;
 
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -106,10 +115,19 @@
   function resetMap() {
     trackLayer.clearLayers();
     ballisticsLayer.clearLayers();
+    bboxLayer.clearLayers();
     allBoundsLatLngs = [];
     els.fileList.innerHTML = "";
     els.bResult.hidden = true;
     els.bResult.innerHTML = "";
+  }
+
+  function drawBboxOverlay(bbox) {
+    bboxLayer.clearLayers();
+    L.rectangle(
+      [[bbox.south, bbox.west], [bbox.north, bbox.east]],
+      { color: "#3cb44b", weight: 2, fillOpacity: 0.05, dashArray: "4,4" }
+    ).addTo(bboxLayer);
   }
 
   // ---- Przeglądarka folderów (server-side) ----------------------------------
@@ -137,12 +155,25 @@
       const full = data.cwd.endsWith(data.sep) ? data.cwd + name : data.cwd + data.sep + name;
       html += `<button class="browser-row" data-go="${escapeHtml(full)}">📁 ${escapeHtml(name)}</button>`;
     }
+    if (data.csv_files && data.csv_files.length > 0) {
+      html += `<div class="browser-section">Pojedyncze pliki .csv (kliknij aby wybrać):</div>`;
+      for (const name of data.csv_files) {
+        const full = data.cwd.endsWith(data.sep) ? data.cwd + name : data.cwd + data.sep + name;
+        html += `<button class="browser-row browser-file" data-pick="${escapeHtml(full)}">📄 ${escapeHtml(name)}</button>`;
+      }
+    }
     els.browser.hidden = false;
     els.browser.innerHTML = html;
   }
 
   els.browse.addEventListener("click", () => loadDir(els.path.value || ""));
   els.browser.addEventListener("click", (ev) => {
+    const pick = ev.target.closest("[data-pick]");
+    if (pick) {
+      els.path.value = pick.getAttribute("data-pick");
+      els.browser.hidden = true;
+      return;
+    }
     const t = ev.target.closest("[data-go]");
     if (!t) return;
     loadDir(t.getAttribute("data-go"));
@@ -150,28 +181,29 @@
 
   // ---- Analiza (SSE) ---------------------------------------------------------
 
-  function startAnalysis() {
-    const path = (els.path.value || "").trim();
-    if (!path) {
-      els.status.textContent = "Najpierw wpisz ścieżkę do folderu z logami.";
-      return;
-    }
+  function runAnalysis(path, bbox) {
     if (currentSource) currentSource.close();
     resetMap();
+    if (bbox) drawBboxOverlay(bbox);
     els.progress.hidden = false;
     els.progress.value = 0;
     els.progress.max = 1;
     els.analyze.disabled = true;
     els.stop.disabled = false;
-    els.status.textContent = "Łączę…";
+    els.status.textContent = bbox ? "Łączę… (filtr obszaru aktywny)" : "Łączę…";
 
-    const src = new EventSource(`/api/analyze?path=${encodeURIComponent(path)}`);
+    let url = `/api/analyze?path=${encodeURIComponent(path)}`;
+    if (bbox) {
+      url += `&bbox=${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
+    }
+    const src = new EventSource(url);
     currentSource = src;
 
     src.addEventListener("start", (e) => {
       const d = JSON.parse(e.data);
       els.progress.max = Math.max(1, d.total);
-      els.status.textContent = `Folder: ${d.folder}. Plików: ${d.total}.`;
+      const scope = d.bbox ? " (z filtrem obszaru)" : "";
+      els.status.textContent = `Folder: ${d.folder}. Plików: ${d.total}${scope}.`;
     });
     src.addEventListener("track", (e) => {
       const d = JSON.parse(e.data);
@@ -186,11 +218,12 @@
       try {
         const d = JSON.parse(e.data || "{}");
         if (d.message) console.warn("Błąd parsera:", d);
-      } catch (_) { /* pewnie reconnect z EventSource */ }
+      } catch (_) { /* reconnect */ }
     });
     src.addEventListener("done", (e) => {
       const d = JSON.parse(e.data);
-      els.status.textContent = `Gotowe: ${d.files_with_gps} plików z GPS, łącznie ${d.total_points} punktów (z ${d.total_files}).`;
+      const skip = d.files_skipped_bbox ? `, pominięto poza obszarem: ${d.files_skipped_bbox}` : "";
+      els.status.textContent = `Gotowe: ${d.files_with_gps} plików z GPS, łącznie ${d.total_points} punktów (z ${d.total_files})${skip}.`;
       els.progress.hidden = true;
       els.analyze.disabled = false;
       els.stop.disabled = true;
@@ -199,8 +232,36 @@
     });
   }
 
+  function startAnalysis() {
+    const path = (els.path.value || "").trim();
+    if (!path) {
+      els.status.textContent = "Najpierw wpisz ścieżkę do folderu albo pliku .csv.";
+      return;
+    }
+    pendingPath = path;
+    showModal();
+  }
+
+  function showModal() { els.modal.hidden = false; }
+  function hideModal() { els.modal.hidden = true; }
+
   els.analyze.addEventListener("click", startAnalysis);
   els.path.addEventListener("keydown", (e) => { if (e.key === "Enter") startAnalysis(); });
+
+  els.modal.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modal-action]");
+    if (!btn) return;
+    const action = btn.dataset.modalAction;
+    hideModal();
+    if (action === "all") {
+      runAnalysis(pendingPath, null);
+      pendingPath = null;
+    } else if (action === "area") {
+      enterDrawMode();
+    } else {
+      pendingPath = null;
+    }
+  });
 
   els.stop.addEventListener("click", () => {
     if (currentSource) {
@@ -214,8 +275,103 @@
   });
 
   els.reset.addEventListener("click", () => {
+    if (!els.areaBar.hidden) exitDrawMode();
     resetMap();
+    pendingPath = null;
     els.status.textContent = "Wpisz ścieżkę do folderu z logami i kliknij „Analizuj”.";
+  });
+
+  // ---- Rysowanie prostokąta na mapie ----------------------------------------
+
+  function enterDrawMode() {
+    els.areaBar.hidden = false;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
+    lastBbox = null;
+    bboxLayer.clearLayers();
+    document.body.classList.add("draw-mode");
+    map.getContainer().classList.add("draw-mode");
+    map.dragging.disable();
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+    map.on("mousedown", onDrawStart);
+    map.on("touchstart", onDrawStart);
+  }
+  function exitDrawMode() {
+    els.areaBar.hidden = true;
+    document.body.classList.remove("draw-mode");
+    map.getContainer().classList.remove("draw-mode");
+    map.dragging.enable();
+    map.doubleClickZoom.enable();
+    map.boxZoom.enable();
+    map.off("mousedown", onDrawStart);
+    map.off("touchstart", onDrawStart);
+    map.off("mousemove", onDrawMove);
+    map.off("mouseup", onDrawEnd);
+    drawState = null;
+  }
+  function onDrawStart(e) {
+    if (e.originalEvent && e.originalEvent.preventDefault) e.originalEvent.preventDefault();
+    drawState = { start: e.latlng, rect: null };
+    map.on("mousemove", onDrawMove);
+    map.on("mouseup", onDrawEnd);
+    map.on("touchmove", onDrawMove);
+    map.on("touchend", onDrawEnd);
+  }
+  function onDrawMove(e) {
+    if (!drawState) return;
+    if (drawState.rect) drawState.rect.remove();
+    drawState.rect = L.rectangle(
+      [drawState.start, e.latlng],
+      { color: "#3cb44b", weight: 2, fillOpacity: 0.1 }
+    ).addTo(bboxLayer);
+  }
+  function onDrawEnd(e) {
+    if (!drawState) return;
+    map.off("mousemove", onDrawMove);
+    map.off("mouseup", onDrawEnd);
+    map.off("touchmove", onDrawMove);
+    map.off("touchend", onDrawEnd);
+    const end = e.latlng || drawState.start;
+    const a = drawState.start;
+    const b = end;
+    if (a.lat === b.lat || a.lng === b.lng) {
+      if (drawState.rect) drawState.rect.remove();
+      drawState = null;
+      return;
+    }
+    lastBbox = {
+      south: Math.min(a.lat, b.lat),
+      north: Math.max(a.lat, b.lat),
+      west: Math.min(a.lng, b.lng),
+      east: Math.max(a.lng, b.lng),
+    };
+    drawState = null;
+    els.areaConfirm.disabled = false;
+    els.areaRedraw.disabled = false;
+  }
+
+  els.areaConfirm.addEventListener("click", () => {
+    if (!lastBbox || !pendingPath) return;
+    const bbox = lastBbox;
+    const path = pendingPath;
+    pendingPath = null;
+    exitDrawMode();
+    runAnalysis(path, bbox);
+  });
+  els.areaRedraw.addEventListener("click", () => {
+    bboxLayer.clearLayers();
+    lastBbox = null;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
+    map.on("mousedown", onDrawStart);
+    map.on("touchstart", onDrawStart);
+  });
+  els.areaCancel.addEventListener("click", () => {
+    exitDrawMode();
+    bboxLayer.clearLayers();
+    pendingPath = null;
+    els.status.textContent = "Anulowano. Wpisz ścieżkę i kliknij „Analizuj”.";
   });
 
   // ---- Symulacja upadku (POST /api/ballistics) ------------------------------

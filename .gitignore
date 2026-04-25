@@ -8,6 +8,9 @@ mapa_drona.html
 mapa_upadku.html
 znalezione_koordynaty.txt
 
+# Rozpakowane archiwum starej wersji (zip wystarczy w repo)
+Stara wersja/szukanie drona claude/
+
 # IDE
 .vscode/
 .idea/

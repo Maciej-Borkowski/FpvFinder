@@ -73,17 +73,19 @@ def list_dir():
         return jsonify({"error": f"Błąd odczytu folderu: {e}"}), 500
 
     dirs = []
-    csv_count = 0
+    csv_files = []
     for name in entries:
         full = os.path.join(path, name)
         try:
             if os.path.isdir(full):
                 dirs.append(name)
             elif log_parser.is_log_file(full):
-                csv_count += 1
+                csv_files.append(name)
         except OSError:
             continue
     dirs.sort(key=lambda s: s.lower())
+    csv_files.sort(key=lambda s: s.lower())
+    csv_count = len(csv_files)
 
     parent = os.path.dirname(path)
     if parent == path:
@@ -93,6 +95,7 @@ def list_dir():
         "cwd": path,
         "parent": parent,
         "dirs": dirs,
+        "csv_files": csv_files,
         "csv_count": csv_count,
         "drives": _windows_drives(),
         "sep": os.sep,
@@ -103,33 +106,77 @@ def _sse(event, payload):
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+def _parse_bbox(raw):
+    """raw = 'south,west,north,east' (floats). Zwraca dict albo None."""
+    if not raw:
+        return None
+    parts = raw.split(",")
+    if len(parts) != 4:
+        return None
+    try:
+        s, w, n, e = (float(p) for p in parts)
+    except ValueError:
+        return None
+    if not (-90 <= s <= 90 and -90 <= n <= 90 and -180 <= w <= 180 and -180 <= e <= 180):
+        return None
+    if s >= n or w >= e:
+        return None
+    return {"south": s, "west": w, "north": n, "east": e}
+
+
+def _in_bbox(point, bbox):
+    return (bbox["south"] <= point["lat"] <= bbox["north"]
+            and bbox["west"] <= point["lon"] <= bbox["east"])
+
+
 @app.route("/api/analyze")
 def analyze():
     raw = request.args.get("path")
     path = _normalize_path(raw)
+    bbox = _parse_bbox(request.args.get("bbox"))
 
     @stream_with_context
     def generate():
-        if not path or not os.path.isdir(path):
-            yield _sse("error", {"message": f"Niepoprawny folder: {raw!r}"})
+        if not path or not os.path.exists(path):
+            yield _sse("error", {"message": f"Ścieżka nie istnieje: {raw!r}"})
             yield _sse("done", {"files_with_gps": 0, "total_points": 0})
             return
 
-        files = log_parser.iter_log_paths(path)
-        yield _sse("start", {"folder": path, "total": len(files)})
+        if os.path.isfile(path):
+            if not log_parser.is_log_file(path):
+                yield _sse("error", {"message": f"Plik nie jest logiem .csv: {raw!r}"})
+                yield _sse("done", {"files_with_gps": 0, "total_points": 0})
+                return
+            files = [path]
+            base_for_relpath = os.path.dirname(path)
+            scope_label = path
+        elif os.path.isdir(path):
+            files = log_parser.iter_log_paths(path)
+            base_for_relpath = path
+            scope_label = path
+        else:
+            yield _sse("error", {"message": f"Nieobsługiwany typ ścieżki: {raw!r}"})
+            yield _sse("done", {"files_with_gps": 0, "total_points": 0})
+            return
+
+        yield _sse("start", {"folder": scope_label, "total": len(files), "bbox": bbox, "single": len(files) == 1 and os.path.isfile(path)})
 
         files_with_gps = 0
         total_points = 0
         track_index = 0
+        files_skipped_bbox = 0
 
         for i, full in enumerate(files, start=1):
-            rel = os.path.relpath(full, path)
+            rel = os.path.relpath(full, base_for_relpath) if base_for_relpath else os.path.basename(full)
             try:
                 pts = log_parser.parse_file(full)
             except Exception as e:
                 yield _sse("error", {"file": rel, "message": str(e)})
                 yield _sse("progress", {"done": i, "total": len(files)})
                 continue
+
+            if bbox and pts:
+                pts = [p for p in pts if _in_bbox(p, bbox)]
 
             if pts:
                 color = PALETTE[track_index % len(PALETTE)]
@@ -141,12 +188,15 @@ def analyze():
                     "color": color,
                     "points": pts,
                 })
+            elif bbox:
+                files_skipped_bbox += 1
             yield _sse("progress", {"done": i, "total": len(files)})
 
         yield _sse("done", {
             "files_with_gps": files_with_gps,
             "total_points": total_points,
             "total_files": len(files),
+            "files_skipped_bbox": files_skipped_bbox,
         })
 
     headers = {

@@ -74,6 +74,10 @@ html, body {
   font-weight: 600;
 }
 .file-btn:hover { background: #324db5; }
+.file-btn-alt {
+  background: #3cb44b;
+}
+.file-btn-alt:hover { background: #2e9039; }
 .btn-secondary, .btn-primary {
   padding: 8px 12px;
   border-radius: 4px;
@@ -235,3 +239,65 @@ progress {
   color: #b0001a;
   font-weight: 600;
 }
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.modal-box {
+  background: #fff;
+  border-radius: 8px;
+  padding: 18px 22px;
+  max-width: 460px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+.modal-box h2 { margin: 0 0 8px; font-size: 16px; }
+.modal-q { margin: 0 0 14px; color: #333; }
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.modal-actions button { padding: 10px 12px; font-size: 13px; }
+.modal-hint {
+  font-size: 11px;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Area-bar (rysowanie obszaru) */
+#area-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 392px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  z-index: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+#area-bar .area-instr {
+  font-size: 12px;
+  color: #333;
+  margin-right: auto;
+}
+#area-bar button { padding: 6px 10px; font-size: 12px; }
+
+body.draw-mode { cursor: crosshair; }
+body.draw-mode #map { cursor: crosshair; }
+.leaflet-container.draw-mode { cursor: crosshair !important; }

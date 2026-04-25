@@ -27,12 +27,16 @@
     <div class="picker">
       <label class="file-btn">
         <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
-        Wybierz folder z logami
+        📁 Folder z logami
+      </label>
+      <label class="file-btn file-btn-alt">
+        <input type="file" id="single-input" accept=".csv" hidden>
+        📄 Jeden log
       </label>
       <button id="reset-btn" class="btn-secondary" title="Wyczyść mapę">Wyczyść</button>
     </div>
 
-    <div id="status" class="status">Wybierz folder z logami EdgeTX (.csv).</div>
+    <div id="status" class="status">Wybierz folder z logami albo pojedynczy plik .csv.</div>
     <progress id="progress" max="1" value="0" hidden></progress>
 
     <div class="legend">
@@ -69,6 +73,28 @@
     <div id="b-result" class="result" hidden></div>
   </section>
 </aside>
+
+<!-- Modal: co zrobić z wybranym folderem -->
+<div id="folder-modal" class="modal" hidden>
+  <div class="modal-box">
+    <h2>Wybrano <span id="modal-count">…</span> plików .csv</h2>
+    <p class="modal-q">Wczytać wszystkie czy zaznaczyć obszar gdzie potencjalnie jest dron?</p>
+    <div class="modal-actions">
+      <button class="btn-primary" data-modal-action="all">Wczytaj wszystkie</button>
+      <button class="btn-secondary" data-modal-action="area">Wybierz obszar na mapie</button>
+      <button class="btn-secondary" data-modal-action="cancel">Anuluj</button>
+    </div>
+    <p class="modal-hint">Wybór obszaru: pomijamy punkty spoza prostokąta. Pliki bez ani jednego punktu w obszarze nie pokażą się na mapie. Przydatne gdy masz dużo logów ale wiesz mniej‑więcej gdzie szukać.</p>
+  </div>
+</div>
+
+<!-- Pasek rysowania prostokąta -->
+<div id="area-bar" hidden>
+  <span class="area-instr">Kliknij i przeciągnij prostokąt na mapie ↓</span>
+  <button id="area-confirm" class="btn-primary" disabled>Analizuj zaznaczony obszar</button>
+  <button id="area-redraw" class="btn-secondary" disabled>Narysuj ponownie</button>
+  <button id="area-cancel" class="btn-secondary">Anuluj</button>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="parser.js"></script>
