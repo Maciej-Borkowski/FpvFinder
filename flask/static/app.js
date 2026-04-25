@@ -30,6 +30,7 @@
     bResult: document.getElementById("b-result"),
     modal: document.getElementById("folder-modal"),
     areaBar: document.getElementById("area-bar"),
+    areaStartDraw: document.getElementById("area-start-draw"),
     areaConfirm: document.getElementById("area-confirm"),
     areaRedraw: document.getElementById("area-redraw"),
     areaCancel: document.getElementById("area-cancel"),
@@ -283,40 +284,44 @@
 
   // ---- Rysowanie prostokąta na mapie ----------------------------------------
 
+  let armedDraw = false;
+
   function enterDrawMode() {
     els.areaBar.hidden = false;
     els.areaConfirm.disabled = true;
     els.areaRedraw.disabled = true;
+    els.areaStartDraw.classList.remove("active");
+    armedDraw = false;
     lastBbox = null;
     bboxLayer.clearLayers();
-    document.body.classList.add("draw-mode");
-    map.getContainer().classList.add("draw-mode");
-    map.dragging.disable();
-    map.doubleClickZoom.disable();
     map.boxZoom.disable();
     map.on("mousedown", onDrawStart);
-    map.on("touchstart", onDrawStart);
   }
   function exitDrawMode() {
     els.areaBar.hidden = true;
     document.body.classList.remove("draw-mode");
-    map.getContainer().classList.remove("draw-mode");
-    map.dragging.enable();
-    map.doubleClickZoom.enable();
+    armedDraw = false;
+    els.areaStartDraw.classList.remove("active");
     map.boxZoom.enable();
+    map.dragging.enable();
     map.off("mousedown", onDrawStart);
-    map.off("touchstart", onDrawStart);
     map.off("mousemove", onDrawMove);
     map.off("mouseup", onDrawEnd);
     drawState = null;
   }
   function onDrawStart(e) {
-    if (e.originalEvent && e.originalEvent.preventDefault) e.originalEvent.preventDefault();
+    const oe = e.originalEvent;
+    const useShift = oe && oe.shiftKey;
+    if (!useShift && !armedDraw) return;
+    if (oe && oe.preventDefault) oe.preventDefault();
+    map.dragging.disable();
+    bboxLayer.clearLayers();
+    lastBbox = null;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
     drawState = { start: e.latlng, rect: null };
     map.on("mousemove", onDrawMove);
     map.on("mouseup", onDrawEnd);
-    map.on("touchmove", onDrawMove);
-    map.on("touchend", onDrawEnd);
   }
   function onDrawMove(e) {
     if (!drawState) return;
@@ -330,8 +335,9 @@
     if (!drawState) return;
     map.off("mousemove", onDrawMove);
     map.off("mouseup", onDrawEnd);
-    map.off("touchmove", onDrawMove);
-    map.off("touchend", onDrawEnd);
+    map.dragging.enable();
+    armedDraw = false;
+    els.areaStartDraw.classList.remove("active");
     const end = e.latlng || drawState.start;
     const a = drawState.start;
     const b = end;
@@ -351,6 +357,11 @@
     els.areaRedraw.disabled = false;
   }
 
+  els.areaStartDraw.addEventListener("click", () => {
+    armedDraw = true;
+    els.areaStartDraw.classList.add("active");
+    document.body.classList.add("draw-mode");
+  });
   els.areaConfirm.addEventListener("click", () => {
     if (!lastBbox || !pendingPath) return;
     const bbox = lastBbox;
@@ -364,8 +375,6 @@
     lastBbox = null;
     els.areaConfirm.disabled = true;
     els.areaRedraw.disabled = true;
-    map.on("mousedown", onDrawStart);
-    map.on("touchstart", onDrawStart);
   });
   els.areaCancel.addEventListener("click", () => {
     exitDrawMode();
