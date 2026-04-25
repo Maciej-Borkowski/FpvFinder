@@ -35,6 +35,7 @@
     modal: document.getElementById("folder-modal"),
     modalCount: document.getElementById("modal-count"),
     areaBar: document.getElementById("area-bar"),
+    areaStartDraw: document.getElementById("area-start-draw"),
     areaConfirm: document.getElementById("area-confirm"),
     areaRedraw: document.getElementById("area-redraw"),
     areaCancel: document.getElementById("area-cancel"),
@@ -239,6 +240,11 @@
     els.modal.hidden = true;
   }
 
+  // Reset value przed otwarciem dialogu, żeby zdarzenie 'change'
+  // odpaliło się też przy ponownym wyborze tego samego folderu/pliku.
+  els.folder.addEventListener("click", () => { els.folder.value = ""; });
+  els.single.addEventListener("click", () => { els.single.value = ""; });
+
   els.folder.addEventListener("change", (e) => {
     if (!e.target.files || e.target.files.length === 0) return;
     pendingFiles = e.target.files;
@@ -296,39 +302,47 @@
     els.areaBar.hidden = false;
     els.areaConfirm.disabled = true;
     els.areaRedraw.disabled = true;
+    els.areaStartDraw.classList.remove("active");
+    armedDraw = false;
     lastBbox = null;
     bboxLayer.clearLayers();
-    document.body.classList.add("draw-mode");
-    map.getContainer().classList.add("draw-mode");
-    map.dragging.disable();
-    map.doubleClickZoom.disable();
+    // Wyłączamy boxZoom (domyślnie Shift+drag = zoom do prostokąta) — przejmujemy ten gest.
     map.boxZoom.disable();
-
     map.on("mousedown", onDrawStart);
-    map.on("touchstart", onDrawStart);
   }
 
   function exitDrawMode() {
     els.areaBar.hidden = true;
     document.body.classList.remove("draw-mode");
-    map.getContainer().classList.remove("draw-mode");
-    map.dragging.enable();
-    map.doubleClickZoom.enable();
+    armedDraw = false;
+    els.areaStartDraw.classList.remove("active");
     map.boxZoom.enable();
+    map.dragging.enable();
     map.off("mousedown", onDrawStart);
-    map.off("touchstart", onDrawStart);
     map.off("mousemove", onDrawMove);
     map.off("mouseup", onDrawEnd);
     drawState = null;
   }
 
+  // Czy "armed" tryb rysowania (po kliknięciu w przycisk "Rysuj prostokąt").
+  // Wtedy następny mousedown rysuje od razu, bez Shifta. Dla touch / pojedynczego gestu.
+  let armedDraw = false;
+
   function onDrawStart(e) {
-    if (e.originalEvent && e.originalEvent.preventDefault) e.originalEvent.preventDefault();
+    const oe = e.originalEvent;
+    const useShift = oe && oe.shiftKey;
+    if (!useShift && !armedDraw) return; // pozwól mapie panować normalnie
+    if (oe && oe.preventDefault) oe.preventDefault();
+    // Wyłącz pan mapy podczas rysowania, żeby nie konfliktował.
+    map.dragging.disable();
+    // Wyczyść poprzedni prostokąt (jeśli rysujemy drugi raz w tej samej sesji).
+    bboxLayer.clearLayers();
+    lastBbox = null;
+    els.areaConfirm.disabled = true;
+    els.areaRedraw.disabled = true;
     drawState = { start: e.latlng, rect: null };
     map.on("mousemove", onDrawMove);
     map.on("mouseup", onDrawEnd);
-    map.on("touchmove", onDrawMove);
-    map.on("touchend", onDrawEnd);
   }
 
   function onDrawMove(e) {
@@ -344,8 +358,10 @@
     if (!drawState) return;
     map.off("mousemove", onDrawMove);
     map.off("mouseup", onDrawEnd);
-    map.off("touchmove", onDrawMove);
-    map.off("touchend", onDrawEnd);
+    // Po zakończeniu rysowania przywróć normalny pan i zdejmij "armed".
+    map.dragging.enable();
+    armedDraw = false;
+    els.areaStartDraw.classList.remove("active");
     const end = e.latlng || drawState.start;
     const a = drawState.start;
     const b = end;
@@ -366,6 +382,12 @@
     els.areaRedraw.disabled = false;
   }
 
+  els.areaStartDraw.addEventListener("click", () => {
+    armedDraw = true;
+    els.areaStartDraw.classList.add("active");
+    document.body.classList.add("draw-mode");
+  });
+
   els.areaConfirm.addEventListener("click", () => {
     if (!lastBbox || !pendingFiles) return;
     const bbox = lastBbox;
@@ -376,13 +398,12 @@
   });
 
   els.areaRedraw.addEventListener("click", () => {
+    // Handler mousedown jest już zarejestrowany w enterDrawMode i nigdy nie był zdjęty.
+    // Wystarczy wyczyścić stan; kolejny mousedown odpali nowe rysowanie (onDrawStart też czyści).
     bboxLayer.clearLayers();
     lastBbox = null;
     els.areaConfirm.disabled = true;
     els.areaRedraw.disabled = true;
-    // ponownie nasłuchujemy mousedown
-    map.on("mousedown", onDrawStart);
-    map.on("touchstart", onDrawStart);
   });
 
   els.areaCancel.addEventListener("click", () => {

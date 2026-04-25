@@ -301,6 +301,19 @@ progress {
 }
 #area-bar button { padding: 6px 10px; font-size: 12px; }
 
-body.draw-mode { cursor: crosshair; }
-body.draw-mode #map { cursor: crosshair; }
-.leaflet-container.draw-mode { cursor: crosshair !important; }
+body.draw-mode .leaflet-container { cursor: crosshair !important; }
+
+#area-bar kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid #999;
+  border-radius: 3px;
+  background: #f4f4f4;
+  font-family: ui-monospace, "Consolas", monospace;
+  font-size: 11px;
+}
+#area-bar button.active {
+  background: #ffe119;
+  border-color: #c69b00;
+  font-weight: 600;
+}
