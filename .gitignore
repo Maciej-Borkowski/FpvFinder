@@ -1,0 +1,17 @@
+# Środowiska Pythonowe (tylko wersja Flask)
+.venv/
+__pycache__/
+*.pyc
+
+# Pliki wygenerowane przez starą wersję
+mapa_drona.html
+mapa_upadku.html
+znalezione_koordynaty.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

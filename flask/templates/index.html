@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>FpvFinder (Flask) — analiza logów GPS z EdgeTX</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+
+<div id="map"></div>
+
+<aside id="side">
+  <header>
+    <h1>FpvFinder <span class="badge">Flask</span></h1>
+    <p class="sub">Wersja serwerowa — wpisujesz ścieżkę do folderu z logami EdgeTX, serwer parsuje pliki i strumieniuje wyniki na żywo.</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="map">Mapa</button>
+    <button class="tab-btn" data-tab="ballistics">Symulacja upadku</button>
+  </nav>
+
+  <section class="tab-pane active" data-pane="map">
+    <div class="picker">
+      <input id="path-input" type="text" placeholder="Wpisz lub wklej ścieżkę do folderu z logami…">
+      <button id="browse-btn" class="btn-secondary" title="Przeglądaj foldery">…</button>
+    </div>
+    <div class="picker">
+      <button id="analyze-btn" class="btn-primary">Analizuj</button>
+      <button id="stop-btn" class="btn-secondary" disabled>Stop</button>
+      <button id="reset-btn" class="btn-secondary">Wyczyść</button>
+    </div>
+
+    <div id="browser" class="browser" hidden></div>
+
+    <div id="status" class="status">Wpisz ścieżkę do folderu z logami i kliknij „Analizuj".</div>
+    <progress id="progress" max="1" value="0" hidden></progress>
+
+    <div class="legend">
+      Duży czerwony pin = OSTATNI punkt lotu (potencjalne miejsce upadku).
+    </div>
+
+    <h2>Znalezione loty</h2>
+    <div id="file-list"></div>
+  </section>
+
+  <section class="tab-pane" data-pane="ballistics">
+    <p class="hint">Zakłada upadek <strong>rozbrojonego</strong> drona (silniki OFF). Symulacja liczona po stronie serwera.</p>
+    <div class="form">
+      <label>Lat <input id="b-lat" type="number" step="0.000001" placeholder="53.487867"></label>
+      <label>Lon <input id="b-lon" type="number" step="0.000001" placeholder="14.894972"></label>
+      <label>Alt [m] <input id="b-alt" type="number" step="1" placeholder="233"></label>
+      <label>Heading [°] <input id="b-hdg" type="number" step="0.1" placeholder="130.3"></label>
+      <label>Prędkość [km/h] <input id="b-gspd" type="number" step="0.1" placeholder="39.5"></label>
+      <details>
+        <summary>Parametry drona</summary>
+        <label>Masa [kg] <input id="b-mass" type="number" step="0.05" value="0.7"></label>
+        <label>Powierzchnia [m²] <input id="b-area" type="number" step="0.005" value="0.03"></label>
+        <label>Cd <input id="b-cd" type="number" step="0.05" value="0.8"></label>
+      </details>
+      <button id="b-run" class="btn-primary">Policz miejsce upadku</button>
+      <button id="b-clear" class="btn-secondary">Wyczyść symulację</button>
+    </div>
+    <div id="b-result" class="result" hidden></div>
+  </section>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+
+</body>
+</html>
