@@ -6,6 +6,9 @@ html, body {
   font-size: 13px;
 }
 
+/* Atrybut hidden musi mieć priorytet nad display: flex z innych regul */
+[hidden] { display: none !important; }
+
 #map {
   position: absolute;
   top: 0; bottom: 0; left: 0;
