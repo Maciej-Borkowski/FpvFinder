@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>FpvFinder (Flask) — analiza logów GPS z EdgeTX</title>
+<title>FpvFinder (Flask) — GPS log analysis from EdgeTX</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
@@ -13,84 +13,87 @@
 
 <aside id="side">
   <header>
-    <h1>FpvFinder <span class="badge">Flask</span></h1>
-    <p class="sub">Wersja serwerowa — wpisujesz ścieżkę do folderu z logami EdgeTX, serwer parsuje pliki i strumieniuje wyniki na żywo.</p>
+    <div class="lang-switch">
+      <button class="lang-btn" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="pl">PL</button>
+    </div>
+    <h1><span data-i18n="app.title">FpvFinder</span> <span class="badge" data-i18n="flask.badge">Flask</span></h1>
+    <p class="sub" data-i18n="flask.sub">Server-side version — type a path to a folder or a single .csv file, the server parses and streams results live.</p>
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="map">Mapa</button>
-    <button class="tab-btn" data-tab="ballistics">Symulacja upadku</button>
+    <button class="tab-btn active" data-tab="map" data-i18n="tab.map">Map</button>
+    <button class="tab-btn" data-tab="ballistics" data-i18n="tab.ballistics">Crash simulation</button>
   </nav>
 
   <section class="tab-pane active" data-pane="map">
     <div class="picker">
-      <input id="path-input" type="text" placeholder="Ścieżka do folderu z logami albo do pojedynczego pliku .csv">
-      <button id="browse-btn" class="btn-secondary" title="Przeglądaj foldery">…</button>
+      <input id="path-input" type="text" data-i18n-placeholder="flask.placeholder" placeholder="Path to a folder of logs or a single .csv file">
+      <button id="browse-btn" class="btn-secondary" title="Browse">…</button>
     </div>
     <div class="picker">
-      <button id="analyze-btn" class="btn-primary">Analizuj</button>
-      <button id="stop-btn" class="btn-secondary" disabled>Stop</button>
-      <button id="reset-btn" class="btn-secondary">Wyczyść</button>
+      <button id="analyze-btn" class="btn-primary" data-i18n="flask.btn.analyze">Analyze</button>
+      <button id="stop-btn" class="btn-secondary" disabled data-i18n="flask.btn.stop">Stop</button>
+      <button id="reset-btn" class="btn-secondary" data-i18n="btn.clear">Clear</button>
     </div>
 
     <div id="browser" class="browser" hidden></div>
 
-    <div id="status" class="status">Wpisz ścieżkę do folderu albo pojedynczego pliku .csv i kliknij „Analizuj".</div>
+    <div id="status" class="status" data-i18n="flask.status.initial">Type a folder or .csv file path and click Analyze.</div>
     <progress id="progress" max="1" value="0" hidden></progress>
 
-    <div class="legend">
-      Duży czerwony pin = OSTATNI punkt lotu (potencjalne miejsce upadku).
+    <div class="legend" data-i18n="legend.last" data-i18n-html>
+      Big red pin = <strong>LAST</strong> flight point (potential crash site).
     </div>
 
-    <h2>Znalezione loty</h2>
+    <h2 data-i18n="side.flights">Found flights</h2>
     <div id="file-list"></div>
   </section>
 
   <section class="tab-pane" data-pane="ballistics">
-    <p class="hint">Zakłada upadek <strong>rozbrojonego</strong> drona (silniki OFF). Symulacja liczona po stronie serwera.</p>
+    <p class="hint" data-i18n="flask.hint.ballistics">Assumes a DISARMED drone (motors OFF). Simulation runs server-side.</p>
     <div class="form">
-      <label>Lat <input id="b-lat" type="number" step="0.000001" placeholder="53.487867"></label>
-      <label>Lon <input id="b-lon" type="number" step="0.000001" placeholder="14.894972"></label>
-      <label>Alt [m] <input id="b-alt" type="number" step="1" placeholder="233"></label>
-      <label>Heading [°] <input id="b-hdg" type="number" step="0.1" placeholder="130.3"></label>
-      <label>Prędkość [km/h] <input id="b-gspd" type="number" step="0.1" placeholder="39.5"></label>
+      <label><span data-i18n="ballistics.label.lat">Lat</span> <input id="b-lat" type="number" step="0.000001" placeholder="53.487867"></label>
+      <label><span data-i18n="ballistics.label.lon">Lon</span> <input id="b-lon" type="number" step="0.000001" placeholder="14.894972"></label>
+      <label><span data-i18n="ballistics.label.alt">Alt [m]</span> <input id="b-alt" type="number" step="1" placeholder="233"></label>
+      <label><span data-i18n="ballistics.label.hdg">Heading [°]</span> <input id="b-hdg" type="number" step="0.1" placeholder="130.3"></label>
+      <label><span data-i18n="ballistics.label.gspd">Ground speed [km/h]</span> <input id="b-gspd" type="number" step="0.1" placeholder="39.5"></label>
       <details>
-        <summary>Parametry drona</summary>
-        <label>Masa [kg] <input id="b-mass" type="number" step="0.05" value="0.7"></label>
-        <label>Powierzchnia [m²] <input id="b-area" type="number" step="0.005" value="0.03"></label>
-        <label>Cd <input id="b-cd" type="number" step="0.05" value="0.8"></label>
+        <summary data-i18n="ballistics.params">Drone parameters</summary>
+        <label><span data-i18n="ballistics.label.mass">Mass [kg]</span> <input id="b-mass" type="number" step="0.05" value="0.7"></label>
+        <label><span data-i18n="ballistics.label.area">Area [m²]</span> <input id="b-area" type="number" step="0.005" value="0.03"></label>
+        <label><span data-i18n="ballistics.label.cd">Cd</span> <input id="b-cd" type="number" step="0.05" value="0.8"></label>
       </details>
-      <button id="b-run" class="btn-primary">Policz miejsce upadku</button>
-      <button id="b-clear" class="btn-secondary">Wyczyść symulację</button>
+      <button id="b-run" class="btn-primary" data-i18n="ballistics.btn.run">Compute crash site</button>
+      <button id="b-clear" class="btn-secondary" data-i18n="ballistics.btn.clear">Clear simulation</button>
     </div>
     <div id="b-result" class="result" hidden></div>
   </section>
 </aside>
 
-<!-- Modal: co zrobić po wpisaniu ścieżki -->
 <div id="folder-modal" class="modal" hidden>
   <div class="modal-box">
-    <h2>Folder gotowy do analizy</h2>
-    <p class="modal-q">Wczytać wszystkie pliki czy zaznaczyć obszar na mapie?</p>
+    <h2 data-i18n="flask.modal.title">Path ready to analyze</h2>
+    <p class="modal-q" data-i18n="modal.q">Load all of them, or mark an area where the drone might be?</p>
     <div class="modal-actions">
-      <button class="btn-primary" data-modal-action="all">Wczytaj wszystkie</button>
-      <button class="btn-secondary" data-modal-action="area">Wybierz obszar na mapie</button>
-      <button class="btn-secondary" data-modal-action="cancel">Anuluj</button>
+      <button class="btn-primary" data-modal-action="all" data-i18n="modal.btn.all">Load all</button>
+      <button class="btn-secondary" data-modal-action="area" data-i18n="modal.btn.area">Select area on map</button>
+      <button class="btn-secondary" data-modal-action="cancel" data-i18n="modal.btn.cancel">Cancel</button>
     </div>
-    <p class="modal-hint">Wybór obszaru: serwer pominie pliki bez ani jednego punktu w prostokącie. Przydatne gdy jest dużo logów ale wiesz mniej‑więcej gdzie szukać.</p>
+    <p class="modal-hint" data-i18n="flask.modal.hint">Area selection: the server skips files with no points inside the rectangle.</p>
   </div>
 </div>
 
-<!-- Pasek rysowania prostokąta -->
 <div id="area-bar" hidden>
-  <span class="area-instr">Najpierw wycentruj mapę, potem kliknij <strong>Rysuj prostokąt</strong> — albo trzymaj <kbd>Shift</kbd> i przeciągnij.</span>
-  <button id="area-start-draw" class="btn-secondary">Rysuj prostokąt</button>
-  <button id="area-confirm" class="btn-primary" disabled>Analizuj zaznaczony obszar</button>
-  <button id="area-redraw" class="btn-secondary" disabled>Narysuj ponownie</button>
-  <button id="area-cancel" class="btn-secondary">Anuluj</button>
+  <span class="area-instr" data-i18n="area.instr" data-i18n-html>First center the map, then click <strong>Draw rectangle</strong> — or hold <kbd>Shift</kbd> and drag.</span>
+  <button id="area-start-draw" class="btn-secondary" data-i18n="area.btn.draw">Draw rectangle</button>
+  <button id="area-confirm" class="btn-primary" disabled data-i18n="area.btn.confirm">Analyze selected area</button>
+  <button id="area-redraw" class="btn-secondary" disabled data-i18n="area.btn.redraw">Draw again</button>
+  <button id="area-cancel" class="btn-secondary" data-i18n="area.btn.cancel">Cancel</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='i18n.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 
 </body>

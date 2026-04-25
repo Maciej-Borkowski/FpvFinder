@@ -62,20 +62,22 @@
     );
   }
 
+  const t = (k, vars) => (window.FpvI18n ? window.FpvI18n.t(k, vars) : k);
+
   function popupHtml(file, p, isLast) {
     const gmaps = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
-    const last = isLast ? `<div class="last-marker">OSTATNI PUNKT</div>` : "";
+    const last = isLast ? `<div class="last-marker">${escapeHtml(t("popup.lastPoint"))}</div>` : "";
     return `
       <div class="popup">
         ${last}
         <div class="popup-name">${escapeHtml(file)}</div>
-        <div>Lat: <code>${p.lat.toFixed(6)}</code></div>
-        <div>Lon: <code>${p.lon.toFixed(6)}</code></div>
-        <div>Czas: ${escapeHtml(p.time || "-")}</div>
-        <div>Alt: ${escapeHtml(p.alt || "-")} m, Sats: ${escapeHtml(p.sats || "-")}, GSpd: ${escapeHtml(p.gspd || "-")}, Hdg: ${escapeHtml(p.hdg || "-")}</div>
+        <div>${escapeHtml(t("ballistics.label.lat"))}: <code>${p.lat.toFixed(6)}</code></div>
+        <div>${escapeHtml(t("ballistics.label.lon"))}: <code>${p.lon.toFixed(6)}</code></div>
+        <div>${escapeHtml(t("popup.time"))}: ${escapeHtml(p.time || "-")}</div>
+        <div>${escapeHtml(t("popup.alt"))}: ${escapeHtml(p.alt || "-")} m, ${escapeHtml(t("popup.sats"))}: ${escapeHtml(p.sats || "-")}, ${escapeHtml(t("popup.gspd"))}: ${escapeHtml(p.gspd || "-")}, ${escapeHtml(t("popup.hdg"))}: ${escapeHtml(p.hdg || "-")}</div>
         <div class="popup-actions">
-          <a href="${gmaps}" target="_blank" rel="noopener">Otwórz w Google Maps</a>
-          ${isLast ? `<button class="link-like" data-load-ballistics='${JSON.stringify(p).replace(/'/g, "&apos;")}'>Wczytaj jako start symulacji upadku</button>` : ""}
+          <a href="${gmaps}" target="_blank" rel="noopener">${escapeHtml(t("popup.openMaps"))}</a>
+          ${isLast ? `<button class="link-like" data-load-ballistics='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${escapeHtml(t("popup.loadBallistics"))}</button>` : ""}
         </div>
       </div>
     `;
@@ -112,7 +114,7 @@
     row.className = "file-row";
     row.innerHTML = `
       <div><span class="swatch" style="background:${color}"></span><span class="name">${escapeHtml(file)}</span></div>
-      <div class="meta">${points.length} punktów. Ostatni: ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}</div>
+      <div class="meta">${escapeHtml(t("fileRow.meta", { n: points.length, lat: last.lat.toFixed(6), lon: last.lon.toFixed(6) }))}</div>
     `;
     row.onclick = () => map.setView([last.lat, last.lon], 17);
     els.fileList.appendChild(row);
@@ -157,7 +159,7 @@
 
     const csvFiles = Array.from(fileList).filter(isCsvFile);
     if (csvFiles.length === 0) {
-      els.status.textContent = "W tym folderze nie ma plików .csv.";
+      els.status.textContent = t("status.noCsv");
       return;
     }
 
@@ -170,8 +172,8 @@
     els.progress.hidden = false;
     els.progress.max = csvFiles.length;
     els.progress.value = 0;
-    const scope = bbox ? "w zaznaczonym obszarze" : "wszystkie";
-    els.status.textContent = `Parsuję ${csvFiles.length} plików (${scope})…`;
+    const scope = bbox ? t("status.scope.area") : t("status.scope.all");
+    els.status.textContent = t("status.parsing", { count: csvFiles.length, scope });
 
     let filesWithGps = 0;
     let totalPoints = 0;
@@ -194,21 +196,23 @@
           filesSkippedBbox++;
         }
       } catch (e) {
-        console.warn("Błąd przy " + display, e);
+        console.warn("Parse error " + display, e);
       }
       els.progress.value = i + 1;
-      const skipNote = filesSkippedBbox > 0 ? `, poza obszarem: ${filesSkippedBbox}` : "";
-      els.status.textContent = `Przetworzono ${i + 1}/${csvFiles.length}. Plików z GPS: ${filesWithGps}, punktów: ${totalPoints}${skipNote}.`;
+      const skip = filesSkippedBbox > 0 ? t("status.skipFragment", { n: filesSkippedBbox }) : "";
+      els.status.textContent = t("status.progress", {
+        done: i + 1, total: csvFiles.length, ok: filesWithGps, pts: totalPoints, skip,
+      });
       await nextFrame();
     }
 
     if (filesWithGps === 0) {
       els.status.textContent = bbox
-        ? `Żaden z ${csvFiles.length} plików nie zawiera punktów w zaznaczonym obszarze.`
-        : `Sprawdzono ${csvFiles.length} plików — żaden nie zawierał poprawnych koordynat GPS.`;
+        ? t("status.noneInArea", { count: csvFiles.length })
+        : t("status.noneAtAll", { count: csvFiles.length });
     } else {
-      const skipNote = filesSkippedBbox > 0 ? ` (pominięto ${filesSkippedBbox} plików spoza obszaru)` : "";
-      els.status.textContent = `Gotowe: ${filesWithGps} plików z GPS, łącznie ${totalPoints} punktów${skipNote}.`;
+      const skip = filesSkippedBbox > 0 ? t("status.doneSkip", { n: filesSkippedBbox }) : "";
+      els.status.textContent = t("status.done", { ok: filesWithGps, pts: totalPoints, skip });
     }
     els.progress.hidden = true;
   }
@@ -232,8 +236,14 @@
     return Array.from(files).filter(isCsvFile).length;
   }
 
+  let lastModalCount = 0;
+  function refreshModalTitle() {
+    const titleEl = document.getElementById("modal-title");
+    if (titleEl) titleEl.textContent = t("modal.title", { count: lastModalCount });
+  }
   function showModal(count) {
-    els.modalCount.textContent = String(count);
+    lastModalCount = count;
+    refreshModalTitle();
     els.modal.hidden = false;
   }
   function hideModal() {
@@ -250,7 +260,7 @@
     pendingFiles = e.target.files;
     const n = countCsv(pendingFiles);
     if (n === 0) {
-      els.status.textContent = "W tym folderze nie ma plików .csv.";
+      els.status.textContent = t("status.noCsv");
       pendingFiles = null;
       return;
     }
@@ -261,7 +271,7 @@
     if (!e.target.files || e.target.files.length === 0) return;
     pendingFiles = e.target.files;
     if (countCsv(pendingFiles) === 0) {
-      els.status.textContent = "Wybrany plik nie jest .csv.";
+      els.status.textContent = t("status.notCsv");
       pendingFiles = null;
       return;
     }
@@ -411,7 +421,7 @@
     bboxLayer.clearLayers();
     pendingFiles = null;
     els.folder.value = "";
-    els.status.textContent = "Anulowano. Wybierz folder z logami EdgeTX (.csv).";
+    els.status.textContent = t("status.cancelled");
   });
 
   els.reset.addEventListener("click", () => {
@@ -420,7 +430,7 @@
     els.folder.value = "";
     els.single.value = "";
     pendingFiles = null;
-    els.status.textContent = "Wybierz folder lub pojedynczy log .csv.";
+    els.status.textContent = t("status.initial");
   });
 
   // ---- Zakładki --------------------------------------------------------------
@@ -430,6 +440,20 @@
     els.panes.forEach((p) => p.classList.toggle("active", p.dataset.pane === name));
   }
   els.tabs.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+  // Po zmianie języka odśwież dynamiczne fragmenty (modal title, popupy, status startowy).
+  window.addEventListener("fpv-langchange", () => {
+    if (lastModalCount) refreshModalTitle();
+    // Statusu w trakcie analizy nie ruszamy (i tak za chwilę zostanie nadpisany).
+    // Jeśli to stan początkowy lub po reset — uaktualnij.
+    const isPending = currentSourceLikeState();
+    if (!isPending) {
+      els.status.textContent = t("status.initial");
+    }
+  });
+  function currentSourceLikeState() {
+    return !els.progress.hidden;
+  }
 
   // ---- Symulacja upadku ------------------------------------------------------
 
@@ -453,16 +477,16 @@
 
     L.circleMarker(start, {
       radius: 9, color: "#000", fillColor: "#000080", fillOpacity: 0.9, weight: 2,
-    }).addTo(ballisticsLayer).bindPopup(`<b>Punkt utraty sygnału / start symulacji</b><br>${start[0].toFixed(6)}, ${start[1].toFixed(6)}`);
+    }).addTo(ballisticsLayer).bindPopup(`<b>${escapeHtml(t("ballistics.result.start"))}</b><br>${start[0].toFixed(6)}, ${start[1].toFixed(6)}`);
 
     L.circle(land, { radius: 40, color: "#3cb44b", fillColor: "#3cb44b", fillOpacity: 0.15, weight: 2 })
       .addTo(ballisticsLayer)
-      .bindTooltip("Promień ~40 m wokół przewidzianego miejsca");
+      .bindTooltip(t("ballistics.result.tooltip"));
 
     L.circleMarker(land, {
       radius: 12, color: "#000", fillColor: "#e6194b", fillOpacity: 1, weight: 2,
     }).addTo(ballisticsLayer).bindPopup(
-      `<b>Przewidziane miejsce upadku</b><br>` +
+      `<b>${escapeHtml(t("ballistics.result.predicted"))}</b><br>` +
       `${land[0].toFixed(6)}, ${land[1].toFixed(6)}<br>` +
       `<a href="https://www.google.com/maps?q=${land[0].toFixed(6)},${land[1].toFixed(6)}" target="_blank" rel="noopener">Google Maps</a>`
     ).openPopup();
@@ -472,13 +496,13 @@
     const gmaps = `https://www.google.com/maps?q=${land[0].toFixed(6)},${land[1].toFixed(6)}`;
     els.bResult.hidden = false;
     els.bResult.innerHTML = `
-      <h3>Wynik symulacji</h3>
-      <div>Czas upadku: <strong>${res.t.toFixed(1)} s</strong></div>
-      <div>Droga pozioma: <strong>${res.dist.toFixed(0)} m</strong></div>
-      <div>Prędkość pozioma końcowa: ${res.vh.toFixed(2)} m/s (start ${(res.params.gspdKmh / 3.6).toFixed(2)})</div>
-      <div>Prędkość pionowa końcowa: ${res.vv.toFixed(2)} m/s w dół</div>
-      <div class="landing">Miejsce upadku:<br><code>${land[0].toFixed(6)}, ${land[1].toFixed(6)}</code></div>
-      <div><a href="${gmaps}" target="_blank" rel="noopener">Otwórz w Google Maps</a></div>
+      <h3>${escapeHtml(t("ballistics.result.title"))}</h3>
+      <div>${escapeHtml(t("ballistics.result.t"))}: <strong>${res.t.toFixed(1)} s</strong></div>
+      <div>${escapeHtml(t("ballistics.result.dist"))}: <strong>${res.dist.toFixed(0)} m</strong></div>
+      <div>${escapeHtml(t("ballistics.result.vh"))}: ${res.vh.toFixed(2)} m/s</div>
+      <div>${escapeHtml(t("ballistics.result.vv"))}: ${res.vv.toFixed(2)} m/s</div>
+      <div class="landing">${escapeHtml(t("ballistics.result.landing"))}:<br><code>${land[0].toFixed(6)}, ${land[1].toFixed(6)}</code></div>
+      <div><a href="${gmaps}" target="_blank" rel="noopener">${escapeHtml(t("ballistics.result.openMaps"))}</a></div>
     `;
   }
 
@@ -506,7 +530,7 @@
     const opts = readBallisticsForm();
     if (!opts) {
       els.bResult.hidden = false;
-      els.bResult.innerHTML = `<div class="error">Uzupełnij wszystkie pola (lat, lon, alt, heading, prędkość).</div>`;
+      els.bResult.innerHTML = `<div class="error">${escapeHtml(t("ballistics.error"))}</div>`;
       return;
     }
     const res = FpvBallistics.simulateDisarmed(opts);
