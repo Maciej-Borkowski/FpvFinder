@@ -29,13 +29,13 @@
   <!-- TAB: Map -->
   <section class="tab-pane active" data-pane="map">
     <div class="picker">
-      <label class="file-btn" data-i18n="btn.folder">
+      <label class="file-btn">
         <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
-        📁 Folder of logs
+        <span data-i18n="btn.folder">📁 Folder of logs</span>
       </label>
-      <label class="file-btn file-btn-alt" data-i18n="btn.singleLog">
+      <label class="file-btn file-btn-alt">
         <input type="file" id="single-input" accept=".csv" hidden>
-        📄 Single log
+        <span data-i18n="btn.singleLog">📄 Single log</span>
       </label>
       <button id="reset-btn" class="btn-secondary" data-i18n="btn.clear" data-i18n-title="btn.clear.title">Clear</button>
     </div>
