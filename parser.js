@@ -190,7 +190,23 @@
     info.satsCol = detectHelper(fields, "sats", "satellites");
     info.gspdCol = detectHelper(fields, "gspd", "groundspeed", "gs(", "speed");
     info.hdgCol = detectHelper(fields, "hdg", "heading", "course", "yaw");
+    info.hdopCol = detectHelper(fields, "hdop", "pdop", "gdop");
     return info;
+  }
+
+  // Szacowanie dokładności GPS w metrach.
+  // Hdop (jeśli jest) * 5m to typowy CEP modułu GPS. Bez Hdop heurystyka po liczbie satelitów.
+  function estimateAccuracy(hdopRaw, satsRaw) {
+    const hdop = parseFloat(hdopRaw);
+    if (!Number.isNaN(hdop) && hdop > 0) return hdop * 5;
+    const sats = parseInt(satsRaw, 10);
+    if (!Number.isNaN(sats)) {
+      if (sats < 4) return 200;
+      if (sats < 6) return 80;
+      if (sats < 8) return 30;
+      return 10;
+    }
+    return null;
   }
 
   // ---- Główne API ------------------------------------------------------------
@@ -227,15 +243,19 @@
       }
       if (!isValidPair(lat, lon)) continue;
 
+      const hdopRaw = valOf(row, info.hdopCol);
+      const satsRaw = valOf(row, info.satsCol);
       points.push({
         time: valOf(row, info.timeCol),
         date: valOf(row, info.dateCol),
         lat,
         lon,
         alt: valOf(row, info.altCol),
-        sats: valOf(row, info.satsCol),
+        sats: satsRaw,
         gspd: valOf(row, info.gspdCol),
         hdg: valOf(row, info.hdgCol),
+        hdop: hdopRaw,
+        accuracy: estimateAccuracy(hdopRaw, satsRaw),  // metry, lub null
       });
     }
     return points;

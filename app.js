@@ -85,6 +85,7 @@
         <div>${escapeHtml(t("ballistics.label.lon"))}: <code>${p.lon.toFixed(6)}</code></div>
         <div>${escapeHtml(t("popup.time"))}: ${escapeHtml(p.time || "-")}</div>
         <div>${escapeHtml(t("popup.alt"))}: ${escapeHtml(p.alt || "-")} m, ${escapeHtml(t("popup.sats"))}: ${escapeHtml(p.sats || "-")}, ${escapeHtml(t("popup.gspd"))}: ${escapeHtml(p.gspd || "-")}, ${escapeHtml(t("popup.hdg"))}: ${escapeHtml(p.hdg || "-")}</div>
+        ${p.accuracy != null ? `<div>${escapeHtml(t("popup.accuracy"))}: ~${p.accuracy.toFixed(0)} m${p.hdop ? ` (Hdop ${escapeHtml(p.hdop)})` : ""}</div>` : ""}
         <div class="popup-actions">
           <a href="${gmaps}" target="_blank" rel="noopener">${escapeHtml(t("popup.openMaps"))}</a>
           <button class="link-like" data-nav-target="${p.lat},${p.lon}">${escapeHtml(t("nav.popup.navigate"))}</button>
@@ -164,7 +165,13 @@
         && p.lon >= bbox.west && p.lon <= bbox.east;
   }
 
-  async function processFolder(fileList, bbox) {
+  const ACC_THRESHOLD = 50;
+  function isAccurate(p) {
+    return p.accuracy != null && p.accuracy <= ACC_THRESHOLD;
+  }
+
+  async function processFolder(fileList, bbox, opts) {
+    opts = opts || {};
     resetMap();
     if (bbox) drawBboxOverlay(bbox);
 
@@ -190,12 +197,18 @@
     let totalPoints = 0;
     let trackIndex = 0;
     let filesSkippedBbox = 0;
+    let pointsSkippedAccuracy = 0;
 
     for (let i = 0; i < csvFiles.length; i++) {
       const f = csvFiles[i];
       const display = f.webkitRelativePath || f.name;
       try {
         let pts = await FpvParser.parseLogFile(f);
+        if (opts.filterAccuracy) {
+          const before = pts.length;
+          pts = pts.filter(isAccurate);
+          pointsSkippedAccuracy += before - pts.length;
+        }
         if (bbox) pts = pts.filter((p) => inBbox(p, bbox));
         if (pts.length > 0) {
           const color = PALETTE[trackIndex % PALETTE.length];
@@ -210,7 +223,8 @@
         console.warn("Parse error " + display, e);
       }
       els.progress.value = i + 1;
-      const skip = filesSkippedBbox > 0 ? t("status.skipFragment", { n: filesSkippedBbox }) : "";
+      let skip = filesSkippedBbox > 0 ? t("status.skipFragment", { n: filesSkippedBbox }) : "";
+      if (pointsSkippedAccuracy > 0) skip += t("status.accuracyNote", { n: pointsSkippedAccuracy });
       els.status.textContent = t("status.progress", {
         done: i + 1, total: csvFiles.length, ok: filesWithGps, pts: totalPoints, skip,
       });
@@ -222,7 +236,8 @@
         ? t("status.noneInArea", { count: csvFiles.length })
         : t("status.noneAtAll", { count: csvFiles.length });
     } else {
-      const skip = filesSkippedBbox > 0 ? t("status.doneSkip", { n: filesSkippedBbox }) : "";
+      let skip = filesSkippedBbox > 0 ? t("status.doneSkip", { n: filesSkippedBbox }) : "";
+      if (pointsSkippedAccuracy > 0) skip += t("status.accuracyNote", { n: pointsSkippedAccuracy });
       els.status.textContent = t("status.done", { ok: filesWithGps, pts: totalPoints, skip });
     }
     els.progress.hidden = true;
@@ -289,15 +304,19 @@
     showModal(1);
   });
 
+  let pendingFilterAccuracy = false;
+
   els.modal.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modal-action]");
     if (!btn) return;
     const action = btn.dataset.modalAction;
+    const filterAccuracy = !!document.getElementById("filter-accuracy")?.checked;
     hideModal();
     if (action === "all") {
-      processFolder(pendingFiles, null);
+      processFolder(pendingFiles, null, { filterAccuracy });
       pendingFiles = null;
     } else if (action === "area") {
+      pendingFilterAccuracy = filterAccuracy;
       enterDrawMode();
     } else {
       pendingFiles = null;
@@ -413,9 +432,11 @@
     if (!lastBbox || !pendingFiles) return;
     const bbox = lastBbox;
     const files = pendingFiles;
+    const filterAccuracy = pendingFilterAccuracy;
     pendingFiles = null;
+    pendingFilterAccuracy = false;
     exitDrawMode();
-    processFolder(files, bbox);
+    processFolder(files, bbox, { filterAccuracy });
   });
 
   els.areaRedraw.addEventListener("click", () => {
@@ -711,14 +732,21 @@
 
   function onDeviceOrientation(e) {
     let heading = null;
-    if (e.webkitCompassHeading != null) {
+    if (e.webkitCompassHeading != null && !Number.isNaN(e.webkitCompassHeading)) {
       heading = e.webkitCompassHeading;
-    } else if (e.alpha != null) {
+    } else if (e.alpha != null && !Number.isNaN(e.alpha)) {
       heading = (360 - e.alpha) % 360;
     }
-    if (heading != null) {
-      nav.deviceHeading = heading;
-      updateCompass();
+    if (heading == null || Number.isNaN(heading)) return;
+    // Throttle do ~30fps przez requestAnimationFrame — wystarczy dla płynnego oka,
+    // ale unikamy 60+ updateow CSS na sekunde.
+    nav.deviceHeading = heading;
+    if (!nav._compassFrameQueued) {
+      nav._compassFrameQueued = true;
+      requestAnimationFrame(() => {
+        nav._compassFrameQueued = false;
+        updateCompass();
+      });
     }
   }
 
@@ -738,10 +766,18 @@
         }).catch(() => {});
       };
     } else {
-      window.addEventListener("deviceorientationabsolute", onDeviceOrientation, true);
-      window.addEventListener("deviceorientation", onDeviceOrientation, true);
+      // Tylko jeden listener — preferujemy absolutny. Dwa naraz powodowały
+      // alternowanie wartości (alpha vs absolute alpha) i wizualne migotanie.
+      const eventName = "ondeviceorientationabsolute" in window
+        ? "deviceorientationabsolute"
+        : "deviceorientation";
+      window.addEventListener(eventName, onDeviceOrientation);
       nav.deviceOrientationListening = true;
     }
+  }
+
+  function ensureLocation() {
+    if (nav.watchId == null) startLocation();
   }
 
   els.locateBtn.addEventListener("click", () => {
@@ -752,6 +788,7 @@
   els.pickTargetBtn.addEventListener("click", () => {
     nav.pickingTarget = !nav.pickingTarget;
     if (nav.pickingTarget) {
+      ensureLocation();
       els.pickTargetBtn.classList.add("active");
       els.pickTargetBtn.textContent = t("nav.pickTargetActive");
       map.getContainer().style.cursor = "crosshair";
@@ -781,6 +818,7 @@
     const lat = parseFloat(parts[0]);
     const lon = parseFloat(parts[1]);
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      ensureLocation();
       setTarget(lat, lon);
       map.closePopup();
     }

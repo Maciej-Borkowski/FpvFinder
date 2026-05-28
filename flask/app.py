@@ -134,6 +134,10 @@ def analyze():
     raw = request.args.get("path")
     path = _normalize_path(raw)
     bbox = _parse_bbox(request.args.get("bbox"))
+    try:
+        accuracy_max = float(request.args.get("accuracy_max")) if request.args.get("accuracy_max") else None
+    except ValueError:
+        accuracy_max = None
 
     @stream_with_context
     def generate():
@@ -165,6 +169,7 @@ def analyze():
         total_points = 0
         track_index = 0
         files_skipped_bbox = 0
+        points_skipped_accuracy = 0
 
         for i, full in enumerate(files, start=1):
             rel = os.path.relpath(full, base_for_relpath) if base_for_relpath else os.path.basename(full)
@@ -174,6 +179,11 @@ def analyze():
                 yield _sse("error", {"file": rel, "message": str(e)})
                 yield _sse("progress", {"done": i, "total": len(files)})
                 continue
+
+            if accuracy_max is not None and pts:
+                before = len(pts)
+                pts = [p for p in pts if p.get("accuracy") is not None and p["accuracy"] <= accuracy_max]
+                points_skipped_accuracy += before - len(pts)
 
             if bbox and pts:
                 pts = [p for p in pts if _in_bbox(p, bbox)]
@@ -197,6 +207,7 @@ def analyze():
             "total_points": total_points,
             "total_files": len(files),
             "files_skipped_bbox": files_skipped_bbox,
+            "points_skipped_accuracy": points_skipped_accuracy,
         })
 
     headers = {

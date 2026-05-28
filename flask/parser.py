@@ -155,7 +155,28 @@ def _detect_columns(fieldnames, sample_rows):
     info["sats_col"] = _detect_helper(fieldnames, "sats", "satellites")
     info["gspd_col"] = _detect_helper(fieldnames, "gspd", "groundspeed", "gs(", "speed")
     info["hdg_col"] = _detect_helper(fieldnames, "hdg", "heading", "course", "yaw")
+    info["hdop_col"] = _detect_helper(fieldnames, "hdop", "pdop", "gdop")
     return info
+
+
+def _estimate_accuracy(hdop_raw, sats_raw):
+    """Hdop * 5m to typowa precyzja modułu GPS. Bez Hdop heurystyka po liczbie satelitów."""
+    try:
+        hdop = float(hdop_raw) if hdop_raw else None
+    except ValueError:
+        hdop = None
+    if hdop is not None and hdop > 0:
+        return hdop * 5.0
+    try:
+        sats = int(sats_raw) if sats_raw else None
+    except ValueError:
+        sats = None
+    if sats is not None:
+        if sats < 4: return 200.0
+        if sats < 6: return 80.0
+        if sats < 8: return 30.0
+        return 10.0
+    return None
 
 
 def parse_file(path):
@@ -196,15 +217,19 @@ def parse_file(path):
                 return ""
             return (row.get(col) or "").strip()
 
+        hdop_raw = _val(info.get("hdop_col"))
+        sats_raw = _val(info.get("sats_col"))
         points.append({
             "time": _val(info.get("time_col")),
             "date": _val(info.get("date_col")),
             "lat": lat,
             "lon": lon,
             "alt": _val(info.get("alt_col")),
-            "sats": _val(info.get("sats_col")),
+            "sats": sats_raw,
             "gspd": _val(info.get("gspd_col")),
             "hdg": _val(info.get("hdg_col")),
+            "hdop": hdop_raw,
+            "accuracy": _estimate_accuracy(hdop_raw, sats_raw),
         })
     return points
 

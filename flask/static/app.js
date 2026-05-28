@@ -79,6 +79,7 @@
         <div>${escapeHtml(t("ballistics.label.lon"))}: <code>${(+p.lon).toFixed(6)}</code></div>
         <div>${escapeHtml(t("popup.time"))}: ${escapeHtml(p.time || "-")}</div>
         <div>${escapeHtml(t("popup.alt"))}: ${escapeHtml(p.alt || "-")} m, ${escapeHtml(t("popup.sats"))}: ${escapeHtml(p.sats || "-")}, ${escapeHtml(t("popup.gspd"))}: ${escapeHtml(p.gspd || "-")}, ${escapeHtml(t("popup.hdg"))}: ${escapeHtml(p.hdg || "-")}</div>
+        ${p.accuracy != null ? `<div>${escapeHtml(t("popup.accuracy"))}: ~${(+p.accuracy).toFixed(0)} m${p.hdop ? ` (Hdop ${escapeHtml(p.hdop)})` : ""}</div>` : ""}
         <div class="popup-actions">
           <a href="${gmaps}" target="_blank" rel="noopener">${escapeHtml(t("popup.openMaps"))}</a>
           <button class="link-like" data-nav-target="${p.lat},${p.lon}">${escapeHtml(t("nav.popup.navigate"))}</button>
@@ -195,7 +196,8 @@
 
   // ---- Analiza (SSE) ---------------------------------------------------------
 
-  function runAnalysis(path, bbox) {
+  function runAnalysis(path, bbox, opts) {
+    opts = opts || {};
     if (currentSource) currentSource.close();
     resetMap();
     if (bbox) drawBboxOverlay(bbox);
@@ -209,6 +211,9 @@
     let url = `/api/analyze?path=${encodeURIComponent(path)}`;
     if (bbox) {
       url += `&bbox=${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
+    }
+    if (opts.filterAccuracy) {
+      url += `&accuracy_max=50`;
     }
     const src = new EventSource(url);
     currentSource = src;
@@ -236,7 +241,8 @@
     });
     src.addEventListener("done", (e) => {
       const d = JSON.parse(e.data);
-      const skip = d.files_skipped_bbox ? t("flask.status.doneSkip", { n: d.files_skipped_bbox }) : "";
+      let skip = d.files_skipped_bbox ? t("flask.status.doneSkip", { n: d.files_skipped_bbox }) : "";
+      if (d.points_skipped_accuracy) skip += t("status.accuracyNote", { n: d.points_skipped_accuracy });
       els.status.textContent = t("flask.status.done", {
         ok: d.files_with_gps, pts: d.total_points, total: d.total_files, skip,
       });
@@ -264,15 +270,19 @@
   els.analyze.addEventListener("click", startAnalysis);
   els.path.addEventListener("keydown", (e) => { if (e.key === "Enter") startAnalysis(); });
 
+  let pendingFilterAccuracy = false;
+
   els.modal.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modal-action]");
     if (!btn) return;
     const action = btn.dataset.modalAction;
+    const filterAccuracy = !!document.getElementById("filter-accuracy")?.checked;
     hideModal();
     if (action === "all") {
-      runAnalysis(pendingPath, null);
+      runAnalysis(pendingPath, null, { filterAccuracy });
       pendingPath = null;
     } else if (action === "area") {
+      pendingFilterAccuracy = filterAccuracy;
       enterDrawMode();
     } else {
       pendingPath = null;
@@ -381,9 +391,11 @@
     if (!lastBbox || !pendingPath) return;
     const bbox = lastBbox;
     const path = pendingPath;
+    const filterAccuracy = pendingFilterAccuracy;
     pendingPath = null;
+    pendingFilterAccuracy = false;
     exitDrawMode();
-    runAnalysis(path, bbox);
+    runAnalysis(path, bbox, { filterAccuracy });
   });
   els.areaRedraw.addEventListener("click", () => {
     bboxLayer.clearLayers();
@@ -595,9 +607,14 @@
   }
   function onDeviceOrientation(e) {
     let h = null;
-    if (e.webkitCompassHeading != null) h = e.webkitCompassHeading;
-    else if (e.alpha != null) h = (360 - e.alpha) % 360;
-    if (h != null) { nav.deviceHeading = h; updateCompass(); }
+    if (e.webkitCompassHeading != null && !Number.isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;
+    else if (e.alpha != null && !Number.isNaN(e.alpha)) h = (360 - e.alpha) % 360;
+    if (h == null || Number.isNaN(h)) return;
+    nav.deviceHeading = h;
+    if (!nav._compassFrameQueued) {
+      nav._compassFrameQueued = true;
+      requestAnimationFrame(() => { nav._compassFrameQueued = false; updateCompass(); });
+    }
   }
   function requestDeviceOrientation() {
     if (nav.deviceOrientationListening) return;
@@ -614,10 +631,14 @@
         }).catch(() => {});
       };
     } else {
-      window.addEventListener("deviceorientationabsolute", onDeviceOrientation, true);
-      window.addEventListener("deviceorientation", onDeviceOrientation, true);
+      const eventName = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+      window.addEventListener(eventName, onDeviceOrientation);
       nav.deviceOrientationListening = true;
     }
+  }
+
+  function ensureLocation() {
+    if (nav.watchId == null) startLocation();
   }
 
   els.locateBtn.addEventListener("click", () => {
@@ -625,6 +646,7 @@
   });
   els.pickTargetBtn.addEventListener("click", () => {
     nav.pickingTarget = !nav.pickingTarget;
+    if (nav.pickingTarget) ensureLocation();
     els.pickTargetBtn.classList.toggle("active", nav.pickingTarget);
     els.pickTargetBtn.textContent = nav.pickingTarget ? t("nav.pickTargetActive") : t("nav.pickTarget");
     map.getContainer().style.cursor = nav.pickingTarget ? "crosshair" : "";
@@ -644,7 +666,7 @@
     if (!btn) return;
     const parts = btn.getAttribute("data-nav-target").split(",");
     const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
-    if (!Number.isNaN(lat) && !Number.isNaN(lon)) { setTarget(lat, lon); map.closePopup(); }
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) { ensureLocation(); setTarget(lat, lon); map.closePopup(); }
   });
 
   els.sidebarToggle.addEventListener("click", () => {

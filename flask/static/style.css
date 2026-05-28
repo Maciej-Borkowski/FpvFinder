@@ -229,6 +229,12 @@ progress { width: 100%; height: 6px; margin-bottom: 8px; }
 .modal-actions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .modal-actions button { padding: 10px 12px; font-size: 13px; }
 .modal-hint { font-size: 11px; color: #666; margin: 0; line-height: 1.4; }
+.modal-checkbox {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; margin-bottom: 10px;
+  padding: 6px 8px; background: #f6f6f6; border-radius: 4px; cursor: pointer;
+}
+.modal-checkbox input { margin: 0; }
 
 /* Area-bar */
 #area-bar {
@@ -280,9 +286,10 @@ body.draw-mode .leaflet-container { cursor: crosshair !important; }
   border-left: 9px solid transparent; border-right: 9px solid transparent;
   border-bottom: 44px solid #4363d8;
   transform: translate(-50%, -100%) rotate(0deg); transform-origin: 50% 100%;
-  transition: transform 0.25s ease-out;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+  will-change: transform;
 }
+.compass-ring { will-change: transform; }
 .compass-info { margin-top: 6px; }
 .compass-distance { font-size: 18px; font-weight: 700; color: #222; }
 .compass-bearing { font-size: 11px; color: #666; }
