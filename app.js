@@ -39,6 +39,16 @@
     areaConfirm: document.getElementById("area-confirm"),
     areaRedraw: document.getElementById("area-redraw"),
     areaCancel: document.getElementById("area-cancel"),
+    locateBtn: document.getElementById("locate-btn"),
+    pickTargetBtn: document.getElementById("pick-target-btn"),
+    clearTargetBtn: document.getElementById("clear-target-btn"),
+    compass: document.getElementById("compass"),
+    compassArrow: document.querySelector("#compass .compass-arrow"),
+    compassRing: document.querySelector("#compass .compass-ring"),
+    compassDistance: document.querySelector("#compass .compass-distance"),
+    compassBearing: document.querySelector("#compass .compass-bearing"),
+    compassPermission: document.getElementById("compass-permission"),
+    sidebarToggle: document.getElementById("sidebar-toggle"),
   };
 
   // ---- Mapa ------------------------------------------------------------------
@@ -77,6 +87,7 @@
         <div>${escapeHtml(t("popup.alt"))}: ${escapeHtml(p.alt || "-")} m, ${escapeHtml(t("popup.sats"))}: ${escapeHtml(p.sats || "-")}, ${escapeHtml(t("popup.gspd"))}: ${escapeHtml(p.gspd || "-")}, ${escapeHtml(t("popup.hdg"))}: ${escapeHtml(p.hdg || "-")}</div>
         <div class="popup-actions">
           <a href="${gmaps}" target="_blank" rel="noopener">${escapeHtml(t("popup.openMaps"))}</a>
+          <button class="link-like" data-nav-target="${p.lat},${p.lon}">${escapeHtml(t("nav.popup.navigate"))}</button>
           ${isLast ? `<button class="link-like" data-load-ballistics='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${escapeHtml(t("popup.loadBallistics"))}</button>` : ""}
         </div>
       </div>
@@ -541,5 +552,252 @@
     ballisticsLayer.clearLayers();
     els.bResult.hidden = true;
     els.bResult.innerHTML = "";
+  });
+
+  // ===== NAVIGATION (Geolocation + compass + target picker) ==================
+
+  const nav = {
+    watchId: null,
+    myPos: null,
+    myMarker: null,
+    accuracyCircle: null,
+    target: null,
+    targetMarker: null,
+    deviceHeading: null,
+    pickingTarget: false,
+    deviceOrientationListening: false,
+  };
+
+  const navLayer = L.layerGroup().addTo(map);
+
+  function toRad(d) { return d * Math.PI / 180; }
+  function toDeg(r) { return r * 180 / Math.PI; }
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function bearingDeg(lat1, lon1, lat2, lon2) {
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  function bearingCardinal(b) {
+    const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    return dirs[Math.round(b / 45) % 8];
+  }
+
+  function formatDistance(m) {
+    if (m < 1000) return `${m.toFixed(0)} ${t("compass.m")}`;
+    return `${(m / 1000).toFixed(m < 10000 ? 2 : 1)} ${t("compass.km")}`;
+  }
+
+  function showCompass() { els.compass.hidden = false; }
+  function hideCompass() { els.compass.hidden = true; }
+
+  function updateCompass() {
+    if (!nav.myPos || !nav.target) {
+      hideCompass();
+      return;
+    }
+    const dist = haversine(nav.myPos.lat, nav.myPos.lon, nav.target.lat, nav.target.lon);
+    const brg = bearingDeg(nav.myPos.lat, nav.myPos.lon, nav.target.lat, nav.target.lon);
+    const heading = nav.deviceHeading || 0;
+    const arrowRotation = brg - heading;
+    if (els.compassArrow) {
+      els.compassArrow.style.transform = `translate(-50%, -100%) rotate(${arrowRotation}deg)`;
+    }
+    if (els.compassRing) {
+      els.compassRing.style.transform = `rotate(${-heading}deg)`;
+    }
+    els.compassDistance.textContent = formatDistance(dist);
+    els.compassBearing.textContent = `${brg.toFixed(0)}° ${bearingCardinal(brg)}`;
+    showCompass();
+  }
+
+  function userIconHtml() {
+    return '<div style="width:14px;height:14px;border-radius:50%;background:#4363d8;border:3px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>';
+  }
+
+  function updateMyPosition(pos) {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = pos.coords.accuracy || 30;
+    const first = !nav.myPos;
+    nav.myPos = { lat, lon, accuracy: acc };
+
+    if (!nav.myMarker) {
+      nav.myMarker = L.marker([lat, lon], {
+        icon: L.divIcon({ html: userIconHtml(), className: "user-loc-icon", iconSize: [20, 20] }),
+        interactive: true,
+        keyboard: false,
+      }).addTo(navLayer).bindPopup(`<b>${escapeHtml(t("nav.popup.myLocation"))}</b><br>${lat.toFixed(6)}, ${lon.toFixed(6)}<br>±${acc.toFixed(0)} m`);
+      nav.accuracyCircle = L.circle([lat, lon], {
+        radius: acc, color: "#4363d8", fillColor: "#4363d8", fillOpacity: 0.12, weight: 1,
+      }).addTo(navLayer);
+    } else {
+      nav.myMarker.setLatLng([lat, lon]);
+      nav.myMarker.setPopupContent(`<b>${escapeHtml(t("nav.popup.myLocation"))}</b><br>${lat.toFixed(6)}, ${lon.toFixed(6)}<br>±${acc.toFixed(0)} m`);
+      nav.accuracyCircle.setLatLng([lat, lon]).setRadius(acc);
+    }
+    if (first) {
+      map.setView([lat, lon], Math.max(map.getZoom(), 15));
+    }
+    updateCompass();
+  }
+
+  function onGeolocationError(err) {
+    let msg = err.message || "Unknown";
+    if (err.code === 1) msg = t("nav.permissionDenied");
+    els.status.textContent = t("nav.gpsError", { msg });
+    stopLocation();
+  }
+
+  function startLocation() {
+    if (!navigator.geolocation) {
+      els.status.textContent = t("nav.gpsUnavailable");
+      return;
+    }
+    nav.watchId = navigator.geolocation.watchPosition(
+      updateMyPosition,
+      onGeolocationError,
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
+    );
+    els.locateBtn.classList.add("active");
+    els.locateBtn.textContent = t("nav.locateStop");
+    requestDeviceOrientation();
+  }
+
+  function stopLocation() {
+    if (nav.watchId != null) {
+      navigator.geolocation.clearWatch(nav.watchId);
+      nav.watchId = null;
+    }
+    if (nav.myMarker) { nav.myMarker.remove(); nav.myMarker = null; }
+    if (nav.accuracyCircle) { nav.accuracyCircle.remove(); nav.accuracyCircle = null; }
+    nav.myPos = null;
+    els.locateBtn.classList.remove("active");
+    els.locateBtn.textContent = t("nav.locate");
+    hideCompass();
+  }
+
+  function setTarget(lat, lon) {
+    nav.target = { lat, lon };
+    if (nav.targetMarker) nav.targetMarker.remove();
+    nav.targetMarker = L.marker([lat, lon], {
+      icon: L.divIcon({ html: "🎯", className: "target-marker-icon", iconSize: [30, 30] }),
+    }).addTo(navLayer).bindPopup(`<b>${escapeHtml(t("nav.popup.target"))}</b><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+    els.clearTargetBtn.hidden = false;
+    els.status.textContent = t("nav.targetSet");
+    updateCompass();
+  }
+
+  function clearTarget() {
+    nav.target = null;
+    if (nav.targetMarker) { nav.targetMarker.remove(); nav.targetMarker = null; }
+    els.clearTargetBtn.hidden = true;
+    hideCompass();
+    els.status.textContent = t("nav.targetCleared");
+  }
+
+  function onDeviceOrientation(e) {
+    let heading = null;
+    if (e.webkitCompassHeading != null) {
+      heading = e.webkitCompassHeading;
+    } else if (e.alpha != null) {
+      heading = (360 - e.alpha) % 360;
+    }
+    if (heading != null) {
+      nav.deviceHeading = heading;
+      updateCompass();
+    }
+  }
+
+  function requestDeviceOrientation() {
+    if (nav.deviceOrientationListening) return;
+    if (typeof DeviceOrientationEvent !== "undefined"
+        && typeof DeviceOrientationEvent.requestPermission === "function") {
+      // iOS 13+ requires user gesture
+      els.compassPermission.hidden = false;
+      els.compassPermission.onclick = () => {
+        DeviceOrientationEvent.requestPermission().then((state) => {
+          if (state === "granted") {
+            window.addEventListener("deviceorientation", onDeviceOrientation);
+            nav.deviceOrientationListening = true;
+            els.compassPermission.hidden = true;
+          }
+        }).catch(() => {});
+      };
+    } else {
+      window.addEventListener("deviceorientationabsolute", onDeviceOrientation, true);
+      window.addEventListener("deviceorientation", onDeviceOrientation, true);
+      nav.deviceOrientationListening = true;
+    }
+  }
+
+  els.locateBtn.addEventListener("click", () => {
+    if (nav.watchId != null) stopLocation();
+    else startLocation();
+  });
+
+  els.pickTargetBtn.addEventListener("click", () => {
+    nav.pickingTarget = !nav.pickingTarget;
+    if (nav.pickingTarget) {
+      els.pickTargetBtn.classList.add("active");
+      els.pickTargetBtn.textContent = t("nav.pickTargetActive");
+      map.getContainer().style.cursor = "crosshair";
+    } else {
+      els.pickTargetBtn.classList.remove("active");
+      els.pickTargetBtn.textContent = t("nav.pickTarget");
+      map.getContainer().style.cursor = "";
+    }
+  });
+
+  els.clearTargetBtn.addEventListener("click", clearTarget);
+
+  map.on("click", (e) => {
+    if (!nav.pickingTarget) return;
+    setTarget(e.latlng.lat, e.latlng.lng);
+    nav.pickingTarget = false;
+    els.pickTargetBtn.classList.remove("active");
+    els.pickTargetBtn.textContent = t("nav.pickTarget");
+    map.getContainer().style.cursor = "";
+  });
+
+  // Set target from popup "Navigate here" button (delegation)
+  document.body.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-nav-target]");
+    if (!btn) return;
+    const parts = btn.getAttribute("data-nav-target").split(",");
+    const lat = parseFloat(parts[0]);
+    const lon = parseFloat(parts[1]);
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      setTarget(lat, lon);
+      map.closePopup();
+    }
+  });
+
+  // Sidebar toggle (mobile)
+  els.sidebarToggle.addEventListener("click", () => {
+    document.body.classList.toggle("sidebar-collapsed");
+    map.invalidateSize();
+  });
+
+  // Re-translate Locate button label on language change
+  window.addEventListener("fpv-langchange", () => {
+    if (nav.watchId != null) els.locateBtn.textContent = t("nav.locateStop");
+    else els.locateBtn.textContent = t("nav.locate");
+    els.pickTargetBtn.textContent = nav.pickingTarget ? t("nav.pickTargetActive") : t("nav.pickTarget");
+    els.clearTargetBtn.textContent = t("nav.clearTarget");
+    if (nav.target) updateCompass();
   });
 })();
