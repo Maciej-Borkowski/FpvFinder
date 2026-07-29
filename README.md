@@ -1,91 +1,92 @@
 # FpvFinder
 
-Analiza logów telemetrycznych z radia EdgeTX (i podobnych OpenTX-pochodnych) i wizualizacja tras GPS na mapie. Pokazuje gdzie był dron i gdzie jest jego ostatni znany punkt — pomaga go znaleźć po crashu. Dodatkowo prosta symulacja balistyczna upadku rozbrojonego drona.
+Analyzes telemetry logs from an EdgeTX radio (and other OpenTX-derived radios) and visualizes the GPS tracks on a map. It shows where the drone flew and where its last known point is — which helps you find it after a crash. It also includes a simple ballistic simulation of a disarmed drone falling.
 
-W repo są **dwie wersje** robiące dokładnie to samo:
+The repo contains **two versions** that do exactly the same thing:
 
-| Wersja | Lokalizacja | Wymaga | Hosting | Pliki idą na serwer? |
-|--------|-------------|--------|---------|----------------------|
-| **A — webowa (czysty JS)** | katalog główny | tylko przeglądarka | **GitHub Pages** za darmo | **NIE** — wszystko liczy się lokalnie |
-| **B — Flask (Python)** | `flask/` | Python 3 + `pip install flask` | tylko lokalnie u siebie | n/d (działa na localhoście) |
+| Version | Location | Requires | Hosting | Do files leave your machine? |
+|---------|----------|----------|---------|------------------------------|
+| **A — web (plain JS)** | repo root | just a browser | **GitHub Pages**, free | **NO** — everything is computed locally |
+| **B — Flask (Python)** | `flask/` | Python 3 + `pip install flask` | local only | n/a (runs on localhost) |
 
-Jeśli chcesz tylko otworzyć stronę i wrzucić folder z logami → wersja A. Jeśli wolisz coś co ma dostęp do całego dysku przez ścieżki (bez wybierania w przeglądarce) → wersja B.
+If you just want to open a page and drop in a folder of logs → version A. If you prefer something that can reach your whole disk by path (no picking files in the browser) → version B.
 
 ---
 
-## Wersja A — webowa (GitHub Pages)
+## Version A — web (GitHub Pages)
 
-### Uruchomienie lokalne (szybki test)
+### Running locally (quick test)
 
-Otwórz `index.html` w przeglądarce. **Nie** przez `file:///` — przeglądarki blokują wtedy część rzeczy. Zamiast tego w katalogu repo uruchom prosty serwer i wejdź na `http://localhost:8000`:
+Open `index.html` in a browser. **Not** through `file:///` — browsers block some features that way. Instead, start a simple server in the repo directory and go to `http://localhost:8000`:
 
 ```bash
-# wbudowany serwer Pythona — wystarczy
+# Python's built-in server is enough
 python -m http.server 8000
 ```
 
-Albo dowolny inny statyczny serwer (np. `npx serve`, Live Server w VS Code itp.).
+Or any other static server (e.g. `npx serve`, Live Server in VS Code, etc.).
 
-### Hosting jako strona na GitHubie — krok po kroku
+### Hosting it as a GitHub page — step by step
 
-#### Wariant 1 — strona „użytkownika” (`https://NAZWA.github.io`)
+#### Option 1 — a "user" page (`https://NAME.github.io`)
 
-To jest to czego chciałeś — adres typu `fpvfinder.github.io`. Tylko **uwaga**: ten adres dostaje konto GitHubowe o nazwie `fpvfinder`, nie da się zrobić sobie subdomeny pod swoim kontem. Czyli musisz albo:
-- mieć/założyć konto GitHub o nazwie `fpvfinder` (jeśli wolne), albo
-- użyć swojego konta — wtedy adres będzie `TWOJ-LOGIN.github.io` (zob. wariant 2 jeśli nie chcesz takiego zalewania całego konta).
+This gives you an address like `fpvfinder.github.io`. One **caveat**: that address belongs to a GitHub account named `fpvfinder` — you cannot create such a subdomain under a different account. So you have to either:
+- own/create a GitHub account named `fpvfinder` (if it's available), or
+- use your own account — then the address will be `YOUR-LOGIN.github.io` (see option 2 if you don't want the project taking over your whole account).
 
-Kroki:
+Steps:
 
-1. Załóż konto na github.com (jeśli nie masz). Login = nazwa w adresie.
-2. Stwórz **publiczne** repozytorium o nazwie **dokładnie** `LOGIN.github.io` (np. `fpvfinder.github.io`). Ważne — bez literówki, w tej formie GitHub rozpoznaje że to ma być strona użytkownika.
-3. W katalogu projektu na komputerze (czyli tutaj) odpal:
+1. Create an account on github.com (if you don't have one). The login becomes the address.
+2. Create a **public** repository named **exactly** `LOGIN.github.io` (e.g. `fpvfinder.github.io`). Important — no typos; only in this exact form does GitHub treat it as a user page.
+3. In the project directory on your computer (i.e. here), run:
 
    ```bash
    git init
-   git add index.html parser.js ballistics.js app.js style.css README.md
+   git add index.html parser.js ballistics.js i18n.js app.js style.css README.md
    git commit -m "Initial commit"
    git branch -M main
    git remote add origin https://github.com/LOGIN/LOGIN.github.io.git
    git push -u origin main
    ```
 
-4. Wejdź na `https://LOGIN.github.io` — strona powinna być widoczna w 1–3 minuty.
-5. (opcjonalnie) W repo: **Settings → Pages** — sprawdź że źródłem jest `main` i `/ (root)`.
+4. Go to `https://LOGIN.github.io` — the page should be live within 1–3 minutes.
+5. (optional) In the repo: **Settings → Pages** — confirm the source is `main` and `/ (root)`.
 
-#### Wariant 2 — strona „projektu” (`https://LOGIN.github.io/fpvfinder`)
+#### Option 2 — a "project" page (`https://LOGIN.github.io/fpvfinder`)
 
-Prościej, działa pod każdym loginem, nie zajmuje całego konta.
+Simpler, works under any login, doesn't take over the whole account.
 
-1. Stwórz publiczne repo o **dowolnej** nazwie, np. `fpvfinder`.
-2. Wypchnij pliki (jak w wariancie 1, tylko zmień `origin` na `https://github.com/LOGIN/fpvfinder.git`).
-3. W repo: **Settings → Pages**:
+1. Create a public repo with **any** name, e.g. `fpvfinder`.
+2. Push the files (same as option 1, just change `origin` to `https://github.com/LOGIN/fpvfinder.git`).
+3. In the repo: **Settings → Pages**:
    - **Source**: `Deploy from a branch`
    - **Branch**: `main`, folder `/ (root)`
-   - kliknij **Save**.
-4. Po kilku minutach strona pojawi się pod `https://LOGIN.github.io/fpvfinder/`.
+   - click **Save**.
+4. After a few minutes the page shows up at `https://LOGIN.github.io/fpvfinder/`.
 
-#### Co wrzucać na GitHuba (a co nie)
+#### What to push to GitHub (and what not to)
 
-Wystarczą te pliki w katalogu głównym:
+These files in the root are all you need:
 
 ```
 index.html
 parser.js
 ballistics.js
+i18n.js
 app.js
 style.css
 README.md
 ```
 
-**Folder `flask/` nie jest potrzebny dla GitHub Pages** — możesz go wrzucić razem (nie zaszkodzi, GitHub Pages go zignoruje), albo dodać do `.gitignore`. Tak samo `Stara wersja/`.
+**The `flask/` folder is not needed for GitHub Pages** — you can push it anyway (it does no harm, GitHub Pages ignores it), or add it to `.gitignore`.
 
-#### Własna domena (opcjonalne)
+#### Custom domain (optional)
 
-Jeśli masz własną domenę (np. `fpvfinder.pl`) i chcesz pod nią postawić tę stronę: w repo zrób plik `CNAME` z domeną w środku, dodaj rekord `CNAME` u rejestratora wskazujący na `LOGIN.github.io`, i włącz **Enforce HTTPS** w Settings → Pages.
+If you own a domain (e.g. `fpvfinder.dev`) and want to serve this page from it: add a `CNAME` file to the repo containing the domain, add a `CNAME` record at your registrar pointing to `LOGIN.github.io`, and enable **Enforce HTTPS** under Settings → Pages.
 
 ---
 
-## Wersja B — Flask (lokalna)
+## Version B — Flask (local)
 
 ```bash
 cd flask
@@ -96,35 +97,29 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Otwórz `http://127.0.0.1:5000`. Wpisz lub wybierz ścieżkę do folderu z logami i kliknij **Analizuj**. Wyniki streamują się na żywo (Server-Sent Events).
+Open `http://127.0.0.1:5000`. Type or pick a path to a folder of logs and click **Analyze**. Results stream in live (Server-Sent Events).
 
-Zmienne środowiskowe:
-- `FPVFINDER_HOST` (domyślnie `127.0.0.1`)
-- `FPVFINDER_PORT` (domyślnie `5000`)
-- `FPVFINDER_DEBUG=1` aby włączyć tryb debug Flaska
-
----
-
-## Format logów
-
-Aplikacja akceptuje pliki **`.csv`** z radia EdgeTX/OpenTX. Parser jest tolerancyjny:
-
-- **Pozycja kolumn** dowolna — szukamy po nazwie nagłówka, nie po indeksie.
-- **Nazwa kolumny GPS** dowolna z fragmentem `gps`/`pos`/`coord`. Wartość: `"lat lon"` rozdzielone spacją (klasyczny EdgeTX), przecinkiem albo średnikiem.
-- **Alternatywa**: dwie osobne kolumny, jedna z `lat`, druga z `lon`/`lng`.
-- **Kodowanie pliku**: próbujemy UTF-8 → CP1250 → Latin-1 (po stronie wersji A: TextDecoder; wersji B: jak w `parser.py`).
-- **Filtr regionu** — żaden. Pokazujemy każdy poprawny punkt (lat ∈ [-90, 90], lon ∈ [-180, 180], różny od (0, 0) — które oznacza brak fixa GPS).
-
-Pliki z niesparowaną kolumną GPS, puste albo bez fixa są po prostu pomijane bez crasha.
+Environment variables:
+- `FPVFINDER_HOST` (default `127.0.0.1`)
+- `FPVFINDER_PORT` (default `5000`)
+- `FPVFINDER_DEBUG=1` to enable Flask's debug mode
 
 ---
 
-## Symulacja upadku
+## Log format
 
-Dla **rozbrojonego** drona (silniki OFF). Druga zakładka. Wpisujesz lat/lon/alt/heading/prędkość ostatnio znaną z telemetrii (albo klikasz „Wczytaj jako start symulacji" w popupie ostatniego punktu trasy), opcjonalnie modyfikujesz parametry drona (masa / Cd / powierzchnia czołowa). Symulacja całkuje ruch z oporem powietrza i pokazuje przewidziane miejsce upadku oraz okrąg ~40 m wokół niego.
+The app accepts **`.csv`** files from an EdgeTX/OpenTX radio. The parser is tolerant:
+
+- **Column position** is arbitrary — columns are found by header name, not by index.
+- **The GPS column name** can be anything containing `gps`/`pos`/`coord`. Value: `"lat lon"` separated by a space (classic EdgeTX), a comma, or a semicolon.
+- **Alternative**: two separate columns, one containing `lat`, the other `lon`/`lng`.
+- **File encoding**: UTF-8 → CP1250 → Latin-1 are tried in order (version A uses `TextDecoder`; version B does it in `parser.py`).
+- **Region filter** — none. Every valid point is shown (lat ∈ [-90, 90], lon ∈ [-180, 180], and not (0, 0) — which means no GPS fix).
+
+Files with an unparsable GPS column, empty files, and files without a fix are simply skipped without crashing.
 
 ---
 
-## Stara wersja
+## Crash simulation
 
-W folderze `Stara wersja/` jest oryginalny zip ze skryptami `find_drone.py` i `analiza_upadku.py` — zostawiony jako referencja, do niczego nie potrzebny.
+For a **disarmed** drone (motors OFF). Second tab. You enter the last lat/lon/alt/heading/speed known from telemetry (or click "Use as crash simulation start" in the popup of a track's last point), and optionally adjust the drone parameters (mass / Cd / frontal area). The simulation integrates the motion with air drag and shows the predicted crash site plus a ~40 m circle around it.

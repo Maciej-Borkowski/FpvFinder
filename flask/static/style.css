@@ -6,7 +6,7 @@ html, body {
   font-size: 13px;
 }
 
-/* Atrybut hidden musi mieć priorytet nad display: flex z innych regul */
+/* The hidden attribute must win over display: flex coming from other rules */
 [hidden] { display: none !important; }
 
 #map {
@@ -309,7 +309,7 @@ body.draw-mode .leaflet-container { cursor: crosshair !important; }
   body.sidebar-collapsed #side { top: auto; bottom: 0; height: 60px; overflow: hidden; padding: 8px 12px; }
   body.sidebar-collapsed #side > * { display: none; }
   body.sidebar-collapsed #side header { display: block; }
-  body.sidebar-collapsed #side header .sub, body.sidebar-collapsed #side header .lang-switch { display: none; }
+  body.sidebar-collapsed #side header .sub { display: none; }
   .sidebar-toggle { display: block; right: 10px; top: 10px; }
   #compass { bottom: calc(50vh + 12px); left: 10px; width: 130px; }
   body.sidebar-collapsed #compass { bottom: 72px; }

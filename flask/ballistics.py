@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Symulacja balistyczna upadku rozbrojonego drona (silniki OFF).
-Wszystkie parametry przyjmowane jako argumenty — zero hardkodów.
+Ballistic simulation of a disarmed drone falling (motors OFF).
+Every parameter is taken as an argument — nothing is hardcoded.
 """
 
 import math

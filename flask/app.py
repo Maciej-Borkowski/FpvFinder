@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-FpvFinder — Flask web app do analizy logów EdgeTX i wizualizacji tras GPS.
-Wersja przeznaczona do uruchamiania lokalnie u pilota.
+FpvFinder — Flask web app for analyzing EdgeTX logs and visualizing GPS tracks.
+This version is meant to be run locally on the pilot's own machine.
 """
 
 import json
@@ -58,19 +58,19 @@ def list_dir():
     raw = request.args.get("path")
     path = _normalize_path(raw) if raw else os.path.expanduser("~")
     if path is None:
-        return jsonify({"error": "Pusta lub niepoprawna ścieżka."}), 400
+        return jsonify({"error": "Empty or invalid path."}), 400
 
     if not os.path.exists(path):
-        return jsonify({"error": f"Ścieżka nie istnieje: {path}"}), 404
+        return jsonify({"error": f"Path does not exist: {path}"}), 404
     if not os.path.isdir(path):
-        return jsonify({"error": f"To nie jest folder: {path}"}), 400
+        return jsonify({"error": f"Not a folder: {path}"}), 400
 
     try:
         entries = os.listdir(path)
     except PermissionError:
-        return jsonify({"error": f"Brak uprawnień do {path}"}), 403
+        return jsonify({"error": f"No permission to read {path}"}), 403
     except OSError as e:
-        return jsonify({"error": f"Błąd odczytu folderu: {e}"}), 500
+        return jsonify({"error": f"Failed to read folder: {e}"}), 500
 
     dirs = []
     csv_files = []
@@ -107,7 +107,7 @@ def _sse(event, payload):
 
 
 def _parse_bbox(raw):
-    """raw = 'south,west,north,east' (floats). Zwraca dict albo None."""
+    """raw = 'south,west,north,east' (floats). Returns a dict, or None."""
     if not raw:
         return None
     parts = raw.split(",")
@@ -142,13 +142,13 @@ def analyze():
     @stream_with_context
     def generate():
         if not path or not os.path.exists(path):
-            yield _sse("error", {"message": f"Ścieżka nie istnieje: {raw!r}"})
+            yield _sse("error", {"message": f"Path does not exist: {raw!r}"})
             yield _sse("done", {"files_with_gps": 0, "total_points": 0})
             return
 
         if os.path.isfile(path):
             if not log_parser.is_log_file(path):
-                yield _sse("error", {"message": f"Plik nie jest logiem .csv: {raw!r}"})
+                yield _sse("error", {"message": f"File is not a .csv log: {raw!r}"})
                 yield _sse("done", {"files_with_gps": 0, "total_points": 0})
                 return
             files = [path]
@@ -159,7 +159,7 @@ def analyze():
             base_for_relpath = path
             scope_label = path
         else:
-            yield _sse("error", {"message": f"Nieobsługiwany typ ścieżki: {raw!r}"})
+            yield _sse("error", {"message": f"Unsupported path type: {raw!r}"})
             yield _sse("done", {"files_with_gps": 0, "total_points": 0})
             return
 
@@ -228,7 +228,7 @@ def run_ballistics():
         hdg = float(data.get("hdg", 0))
         gspd = float(data.get("gspd_kmh", 0))
     except (KeyError, TypeError, ValueError):
-        return jsonify({"error": "Wymagane: lat, lon, alt, hdg, gspd_kmh (liczby)."}), 400
+        return jsonify({"error": "Required: lat, lon, alt, hdg, gspd_kmh (numbers)."}), 400
 
     mass = float(data.get("mass", 0.7))
     area = float(data.get("area", 0.03))
@@ -245,5 +245,5 @@ if __name__ == "__main__":
     host = os.environ.get("FPVFINDER_HOST", "127.0.0.1")
     port = int(os.environ.get("FPVFINDER_PORT", "5000"))
     debug = os.environ.get("FPVFINDER_DEBUG", "0") == "1"
-    print(f"FpvFinder uruchomiony: http://{host}:{port}", file=sys.stderr)
+    print(f"FpvFinder running at: http://{host}:{port}", file=sys.stderr)
     app.run(host=host, port=port, debug=debug, threaded=True)

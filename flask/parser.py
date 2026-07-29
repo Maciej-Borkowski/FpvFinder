@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Parsowanie CSV-ów telemetrycznych z EdgeTX (i innych radii OpenTX-pochodnych).
-Elastyczne wykrywanie kolumn — pozycja kolumny GPS może się różnić u różnych
-użytkowników (zależnie od skonfigurowanych sensorów), nazewnictwo również.
+Parsing of telemetry CSVs from EdgeTX (and other OpenTX-derived radios).
+Flexible column detection — the position of the GPS column varies between users
+(depending on the sensors they have configured), and so does the naming.
 """
 
 import csv
@@ -160,7 +160,8 @@ def _detect_columns(fieldnames, sample_rows):
 
 
 def _estimate_accuracy(hdop_raw, sats_raw):
-    """Hdop * 5m to typowa precyzja modułu GPS. Bez Hdop heurystyka po liczbie satelitów."""
+    """Hdop * 5 m is a typical GPS module precision. Without Hdop, fall back to a
+    heuristic based on the satellite count."""
     try:
         hdop = float(hdop_raw) if hdop_raw else None
     except ValueError:
@@ -181,7 +182,7 @@ def _estimate_accuracy(hdop_raw, sats_raw):
 
 def parse_file(path):
     """
-    Czyta CSV i zwraca listę punktów GPS:
+    Reads a CSV and returns a list of GPS points:
       [{"time", "date", "lat", "lon", "alt", "sats", "gspd", "hdg"}, ...]
     """
     text = open_csv(path)

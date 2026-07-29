@@ -1,6 +1,6 @@
-// FpvFinder (Flask) — frontend rozmawia z lokalnym backendem Pythonowym.
-// Folder wybierany jest po stronie serwera (/api/list-dir),
-// analiza streamuje wyniki przez Server-Sent Events (/api/analyze).
+// FpvFinder (Flask) — frontend talking to the local Python backend.
+// The folder is picked server-side (/api/list-dir), and the analysis
+// streams its results over Server-Sent Events (/api/analyze).
 
 (function () {
   "use strict";
@@ -145,7 +145,7 @@
     ).addTo(bboxLayer);
   }
 
-  // ---- Przeglądarka folderów (server-side) ----------------------------------
+  // ---- Folder browser (server-side) -----------------------------------------
 
   async function loadDir(path) {
     const url = "/api/list-dir" + (path ? `?path=${encodeURIComponent(path)}` : "");
@@ -153,7 +153,7 @@
     const data = await r.json();
     if (!r.ok) {
       els.browser.hidden = false;
-      els.browser.innerHTML = `<div class="error">${escapeHtml(data.error || "Błąd")}</div>`;
+      els.browser.innerHTML = `<div class="error">${escapeHtml(data.error || "Error")}</div>`;
       return;
     }
     els.path.value = data.cwd;
@@ -194,7 +194,7 @@
     loadDir(t.getAttribute("data-go"));
   });
 
-  // ---- Analiza (SSE) ---------------------------------------------------------
+  // ---- Analysis (SSE) --------------------------------------------------------
 
   function runAnalysis(path, bbox, opts) {
     opts = opts || {};
@@ -307,7 +307,7 @@
     els.status.textContent = t("flask.status.initial");
   });
 
-  // ---- Rysowanie prostokąta na mapie ----------------------------------------
+  // ---- Drawing the rectangle on the map -------------------------------------
 
   let armedDraw = false;
 
@@ -410,7 +410,7 @@
     els.status.textContent = t("flask.status.cancelled");
   });
 
-  // ---- Symulacja upadku (POST /api/ballistics) ------------------------------
+  // ---- Crash simulation (POST /api/ballistics) ------------------------------
 
   document.body.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-load-ballistics]");
@@ -490,7 +490,7 @@
     const data = await r.json();
     if (!r.ok) {
       els.bResult.hidden = false;
-      els.bResult.innerHTML = `<div class="error">${escapeHtml(data.error || "Błąd")}</div>`;
+      els.bResult.innerHTML = `<div class="error">${escapeHtml(data.error || "Error")}</div>`;
       return;
     }
     renderBallistics(data);

@@ -6,7 +6,7 @@ html, body {
   font-size: 13px;
 }
 
-/* Atrybut hidden musi mieć priorytet nad display: flex z innych regul */
+/* The hidden attribute must win over display: flex coming from other rules */
 [hidden] { display: none !important; }
 
 #map {
@@ -32,29 +32,6 @@ html, body {
   font-size: 18px;
 }
 
-.lang-switch {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  gap: 2px;
-}
-.lang-btn {
-  padding: 2px 8px;
-  font-size: 11px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 3px;
-  cursor: pointer;
-  font-weight: 600;
-  color: #555;
-}
-.lang-btn:hover { background: #eef; }
-.lang-btn.active {
-  background: #4363d8;
-  color: white;
-  border-color: #4363d8;
-}
 #side header .sub {
   color: #555;
   font-size: 12px;
@@ -314,7 +291,7 @@ progress {
 }
 .modal-checkbox input { margin: 0; }
 
-/* Area-bar (rysowanie obszaru) */
+/* Area-bar (area drawing) */
 #area-bar {
   position: absolute;
   top: 12px;
@@ -510,8 +487,7 @@ body.draw-mode .leaflet-container { cursor: crosshair !important; }
   }
   body.sidebar-collapsed #side > * { display: none; }
   body.sidebar-collapsed #side header { display: block; }
-  body.sidebar-collapsed #side header .sub,
-  body.sidebar-collapsed #side header .lang-switch { display: none; }
+  body.sidebar-collapsed #side header .sub { display: none; }
 
   .sidebar-toggle {
     display: block;

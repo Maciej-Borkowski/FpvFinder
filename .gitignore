@@ -1,15 +1,14 @@
-# Środowiska Pythonowe (tylko wersja Flask)
+# Python environments (Flask version only)
 .venv/
 __pycache__/
 *.pyc
 
-# Pliki wygenerowane przez starą wersję
-mapa_drona.html
-mapa_upadku.html
-znalezione_koordynaty.txt
+# Generated map/coordinate dumps
+*_map.html
+*_coordinates.txt
 
-# Rozpakowane archiwum starej wersji (zip wystarczy w repo)
-Stara wersja/szukanie drona claude/
+# Local first-generation scripts, never committed
+legacy/
 
 # IDE
 .vscode/

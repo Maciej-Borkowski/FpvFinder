@@ -1,6 +1,6 @@
-// FpvFinder — frontend (czysty JS, działa lokalnie w przeglądarce).
-// Czyta wybrany folder z logami EdgeTX i rysuje trasy GPS na mapie Leaflet,
-// na bieżąco — w miarę jak parser przerabia kolejne pliki.
+// FpvFinder — frontend (plain JS, runs entirely in the browser).
+// Reads the selected folder of EdgeTX logs and draws the GPS tracks on a Leaflet
+// map incrementally — as the parser works through the files one by one.
 
 (function () {
   "use strict";
@@ -51,9 +51,9 @@
     sidebarToggle: document.getElementById("sidebar-toggle"),
   };
 
-  // ---- Mapa ------------------------------------------------------------------
+  // ---- Map -------------------------------------------------------------------
 
-  const map = L.map("map").setView([52.0, 19.0], 6); // domyślnie centralnie nad Polską
+  const map = L.map("map").setView([52.0, 19.0], 6); // default view: centred on Poland
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap",
@@ -137,7 +137,7 @@
     }
   }
 
-  // Delegacja kliknięcia w przycisk popupa "Wczytaj jako start symulacji"
+  // Delegated click handler for the popup's "Use as crash simulation start" button
   document.body.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-load-ballistics]");
     if (!btn) return;
@@ -148,13 +148,13 @@
     switchTab("ballistics");
   });
 
-  // ---- Czytanie folderu ------------------------------------------------------
+  // ---- Reading the folder ----------------------------------------------------
 
   function isCsvFile(file) {
     return FpvParser.isLogFile(file);
   }
 
-  // Małe opóźnienie, żeby UI zdążył odrysować pomiędzy plikami (mapa "na bieżąco")
+  // A small yield so the UI can repaint between files (the "live" map effect)
   function nextFrame() {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
@@ -254,7 +254,7 @@
     els.bResult.innerHTML = "";
   }
 
-  // ---- Modal po wyborze folderu ----------------------------------------------
+  // ---- Modal shown after picking a folder ------------------------------------
 
   let pendingFiles = null;
 
@@ -276,8 +276,8 @@
     els.modal.hidden = true;
   }
 
-  // Reset value przed otwarciem dialogu, żeby zdarzenie 'change'
-  // odpaliło się też przy ponownym wyborze tego samego folderu/pliku.
+  // Reset value before opening the dialog so the 'change' event still fires
+  // when the same folder/file is picked a second time.
   els.folder.addEventListener("click", () => { els.folder.value = ""; });
   els.single.addEventListener("click", () => { els.single.value = ""; });
 
@@ -325,7 +325,7 @@
     }
   });
 
-  // ---- Rysowanie prostokąta na mapie -----------------------------------------
+  // ---- Drawing the rectangle on the map --------------------------------------
 
   let drawState = null;
   let lastBbox = null;
@@ -346,7 +346,7 @@
     armedDraw = false;
     lastBbox = null;
     bboxLayer.clearLayers();
-    // Wyłączamy boxZoom (domyślnie Shift+drag = zoom do prostokąta) — przejmujemy ten gest.
+    // Disable boxZoom (Shift+drag zooms to a box by default) — we take over that gesture.
     map.boxZoom.disable();
     map.on("mousedown", onDrawStart);
   }
@@ -364,18 +364,19 @@
     drawState = null;
   }
 
-  // Czy "armed" tryb rysowania (po kliknięciu w przycisk "Rysuj prostokąt").
-  // Wtedy następny mousedown rysuje od razu, bez Shifta. Dla touch / pojedynczego gestu.
+  // Whether draw mode is "armed" (after clicking the "Draw rectangle" button).
+  // Then the next mousedown starts drawing right away, without Shift — for touch
+  // and single-gesture use.
   let armedDraw = false;
 
   function onDrawStart(e) {
     const oe = e.originalEvent;
     const useShift = oe && oe.shiftKey;
-    if (!useShift && !armedDraw) return; // pozwól mapie panować normalnie
+    if (!useShift && !armedDraw) return; // let the map pan normally
     if (oe && oe.preventDefault) oe.preventDefault();
-    // Wyłącz pan mapy podczas rysowania, żeby nie konfliktował.
+    // Disable map panning while drawing so the two gestures don't conflict.
     map.dragging.disable();
-    // Wyczyść poprzedni prostokąt (jeśli rysujemy drugi raz w tej samej sesji).
+    // Clear the previous rectangle (in case this is a second draw in the same session).
     bboxLayer.clearLayers();
     lastBbox = null;
     els.areaConfirm.disabled = true;
@@ -398,7 +399,7 @@
     if (!drawState) return;
     map.off("mousemove", onDrawMove);
     map.off("mouseup", onDrawEnd);
-    // Po zakończeniu rysowania przywróć normalny pan i zdejmij "armed".
+    // Once drawing is done, restore normal panning and clear the "armed" flag.
     map.dragging.enable();
     armedDraw = false;
     els.areaStartDraw.classList.remove("active");
@@ -406,7 +407,7 @@
     const a = drawState.start;
     const b = end;
     if (a.lat === b.lat || a.lng === b.lng) {
-      // zbyt mały prostokąt — anuluj rysowanie tej próby
+      // rectangle too small — cancel this attempt
       if (drawState.rect) drawState.rect.remove();
       drawState = null;
       return;
@@ -440,8 +441,9 @@
   });
 
   els.areaRedraw.addEventListener("click", () => {
-    // Handler mousedown jest już zarejestrowany w enterDrawMode i nigdy nie był zdjęty.
-    // Wystarczy wyczyścić stan; kolejny mousedown odpali nowe rysowanie (onDrawStart też czyści).
+    // The mousedown handler was registered in enterDrawMode and never removed.
+    // Clearing the state is enough; the next mousedown starts a new draw
+    // (onDrawStart clears things too).
     bboxLayer.clearLayers();
     lastBbox = null;
     els.areaConfirm.disabled = true;
@@ -465,7 +467,7 @@
     els.status.textContent = t("status.initial");
   });
 
-  // ---- Zakładki --------------------------------------------------------------
+  // ---- Tabs ------------------------------------------------------------------
 
   function switchTab(name) {
     els.tabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
@@ -473,11 +475,11 @@
   }
   els.tabs.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
 
-  // Po zmianie języka odśwież dynamiczne fragmenty (modal title, popupy, status startowy).
+  // On language change, refresh the dynamic bits (modal title, popups, initial status).
   window.addEventListener("fpv-langchange", () => {
     if (lastModalCount) refreshModalTitle();
-    // Statusu w trakcie analizy nie ruszamy (i tak za chwilę zostanie nadpisany).
-    // Jeśli to stan początkowy lub po reset — uaktualnij.
+    // Leave the status alone mid-analysis (it gets overwritten in a moment anyway).
+    // Only update it in the initial or post-reset state.
     const isPending = currentSourceLikeState();
     if (!isPending) {
       els.status.textContent = t("status.initial");
@@ -487,7 +489,7 @@
     return !els.progress.hidden;
   }
 
-  // ---- Symulacja upadku ------------------------------------------------------
+  // ---- Crash simulation ------------------------------------------------------
 
   function fillBallisticsForm(p) {
     if (p.lat != null) els.bLat.value = p.lat;
@@ -738,8 +740,8 @@
       heading = (360 - e.alpha) % 360;
     }
     if (heading == null || Number.isNaN(heading)) return;
-    // Throttle do ~30fps przez requestAnimationFrame — wystarczy dla płynnego oka,
-    // ale unikamy 60+ updateow CSS na sekunde.
+    // Throttle to ~30fps via requestAnimationFrame — smooth enough to the eye,
+    // while avoiding 60+ CSS updates per second.
     nav.deviceHeading = heading;
     if (!nav._compassFrameQueued) {
       nav._compassFrameQueued = true;
@@ -766,8 +768,8 @@
         }).catch(() => {});
       };
     } else {
-      // Tylko jeden listener — preferujemy absolutny. Dwa naraz powodowały
-      // alternowanie wartości (alpha vs absolute alpha) i wizualne migotanie.
+      // Only one listener — prefer the absolute one. Two at once made the values
+      // alternate (alpha vs absolute alpha), which showed up as visual flicker.
       const eventName = "ondeviceorientationabsolute" in window
         ? "deviceorientationabsolute"
         : "deviceorientation";

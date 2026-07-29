@@ -1,8 +1,8 @@
-// Prosta warstwa i18n — słownik EN/PL, przełącznik w nagłówku.
+// Minimal i18n layer — single English string table.
 // API: FpvI18n.t(key, vars), FpvI18n.set(lang), FpvI18n.get()
-// Statyczne napisy w HTML: <element data-i18n="key">fallback</element>
-// data-i18n-html — wstawi przez innerHTML (gdy klucz zawiera <kbd>, <strong>)
-// data-i18n-placeholder, data-i18n-title — atrybuty.
+// Static strings in HTML: <element data-i18n="key">fallback</element>
+// data-i18n-html — inserts via innerHTML (for keys containing <kbd>, <strong>)
+// data-i18n-placeholder, data-i18n-title — set the matching attribute.
 
 (function (g) {
   "use strict";
@@ -122,120 +122,6 @@
       "flask.browser.filesSection": "Single .csv files (click to pick):",
       "flask.hint.ballistics": "Assumes a DISARMED drone (motors OFF). Simulation runs server-side.",
     },
-    pl: {
-      "doc.title": "FpvFinder — analiza logów GPS z EdgeTX",
-      "app.title": "FpvFinder",
-      "app.sub": "Analiza logów GPS z radia EdgeTX. Wszystko liczone lokalnie w przeglądarce — pliki <strong>nigdzie nie są wysyłane</strong>.",
-      "tab.map": "Mapa",
-      "tab.ballistics": "Symulacja upadku",
-      "btn.folder": "📁 Folder z logami",
-      "btn.singleLog": "📄 Jeden log",
-      "btn.clear": "Wyczyść",
-      "btn.clear.title": "Wyczyść mapę",
-      "status.initial": "Wybierz folder z logami albo pojedynczy plik .csv.",
-      "status.noCsv": "W tym folderze nie ma plików .csv.",
-      "status.notCsv": "Wybrany plik nie jest .csv.",
-      "status.parsing": "Parsuję {count} plików ({scope})…",
-      "status.scope.all": "wszystkie",
-      "status.scope.area": "w zaznaczonym obszarze",
-      "status.progress": "Przetworzono {done}/{total}. Plików z GPS: {ok}, punktów: {pts}{skip}.",
-      "status.skipFragment": ", poza obszarem: {n}",
-      "status.noneInArea": "Żaden z {count} plików nie zawiera punktów w zaznaczonym obszarze.",
-      "status.noneAtAll": "Sprawdzono {count} plików — żaden nie zawierał poprawnych koordynat GPS.",
-      "status.done": "Gotowe: {ok} plików z GPS, łącznie {pts} punktów{skip}.",
-      "status.doneSkip": " (pominięto {n} plików spoza obszaru)",
-      "status.cancelled": "Anulowano. Wybierz folder z logami albo pojedynczy plik .csv.",
-      "legend.last": "Duży czerwony pin = <strong>OSTATNI</strong> punkt lotu (potencjalne miejsce upadku). Klik w pin pokaże nazwę pliku, czas, alt, sats, prędkość.",
-      "side.flights": "Znalezione loty",
-      "ballistics.hint": "Zakłada upadek <strong>ROZBROJONEGO</strong> drona (silniki OFF). Spadanie z oporem powietrza, prędkość pozioma wytraca się.",
-      "ballistics.label.lat": "Lat",
-      "ballistics.label.lon": "Lon",
-      "ballistics.label.alt": "Alt [m]",
-      "ballistics.label.hdg": "Heading [°]",
-      "ballistics.label.gspd": "Prędkość [km/h]",
-      "ballistics.params": "Parametry drona",
-      "ballistics.label.mass": "Masa [kg]",
-      "ballistics.label.area": "Powierzchnia [m²]",
-      "ballistics.label.cd": "Cd",
-      "ballistics.btn.run": "Policz miejsce upadku",
-      "ballistics.btn.clear": "Wyczyść symulację",
-      "ballistics.error": "Uzupełnij wszystkie pola (lat, lon, alt, heading, prędkość).",
-      "ballistics.result.title": "Wynik symulacji",
-      "ballistics.result.t": "Czas upadku",
-      "ballistics.result.dist": "Droga pozioma",
-      "ballistics.result.vh": "Prędkość pozioma końcowa",
-      "ballistics.result.vv": "Prędkość pionowa końcowa (w dół)",
-      "ballistics.result.start": "Punkt utraty sygnału / start symulacji",
-      "ballistics.result.predicted": "Przewidziane miejsce upadku",
-      "ballistics.result.tooltip": "Promień ~40 m wokół przewidzianego miejsca",
-      "ballistics.result.landing": "Miejsce upadku",
-      "ballistics.result.openMaps": "Otwórz w Google Maps",
-      "modal.title": "Pliki .csv do analizy: {count}",
-      "modal.q": "Wczytać wszystkie czy zaznaczyć obszar gdzie potencjalnie jest dron?",
-      "modal.btn.all": "Wczytaj wszystkie",
-      "modal.btn.area": "Wybierz obszar na mapie",
-      "modal.btn.cancel": "Anuluj",
-      "modal.hint": "Wybór obszaru: pomijamy punkty spoza prostokąta. Pliki bez ani jednego punktu w obszarze nie pokażą się na mapie. Przydatne gdy masz dużo logów ale wiesz mniej‑więcej gdzie szukać.",
-      "modal.filterAccuracy": "Tylko punkty z dokładnością GPS ≤ 50 m",
-      "popup.accuracy": "Dokładność",
-      "status.accuracyNote": ", pominięto słabe GPS: {n}",
-      "area.instr": 'Najpierw wycentruj mapę, potem kliknij <strong>Rysuj prostokąt</strong> — albo trzymaj <kbd>Shift</kbd> i przeciągnij.',
-      "area.btn.draw": "Rysuj prostokąt",
-      "area.btn.confirm": "Analizuj zaznaczony obszar",
-      "area.btn.redraw": "Narysuj ponownie",
-      "area.btn.cancel": "Anuluj",
-      "popup.lastPoint": "OSTATNI PUNKT",
-      "popup.time": "Czas",
-      "popup.alt": "Alt",
-      "popup.sats": "Sats",
-      "popup.gspd": "GSpd",
-      "popup.hdg": "Hdg",
-      "popup.openMaps": "Otwórz w Google Maps",
-      "popup.loadBallistics": "Wczytaj jako start symulacji upadku",
-      "fileRow.meta": "{n} punktów. Ostatni: {lat}, {lon}",
-      "nav.section": "Nawigacja",
-      "nav.locate": "📍 Pokaż moją pozycję",
-      "nav.locateStop": "📍 Zatrzymaj śledzenie",
-      "nav.pickTarget": "🎯 Wybierz cel na mapie",
-      "nav.pickTargetActive": "🎯 Kliknij na mapie…",
-      "nav.clearTarget": "✕ Usuń cel",
-      "nav.popup.navigate": "🎯 Nawiguj tutaj",
-      "nav.popup.myLocation": "Twoja pozycja",
-      "nav.popup.target": "Cel nawigacji",
-      "nav.gpsUnavailable": "GPS niedostępne w tej przeglądarce.",
-      "nav.permissionDenied": "Brak zgody na lokalizację. Włącz w ustawieniach przeglądarki.",
-      "nav.gpsError": "Błąd GPS: {msg}",
-      "nav.needLocationFirst": "Najpierw włącz „Pokaż moją pozycję”.",
-      "nav.targetSet": "Cel ustawiony. Kompas widoczny na mapie.",
-      "nav.targetCleared": "Cel usunięty.",
-      "nav.compassPermissionBtn": "Włącz kompas",
-      "compass.distance": "Dystans",
-      "compass.bearing": "Azymut",
-      "compass.km": "km",
-      "compass.m": "m",
-      "ui.toggleSidebar": "Pokaż/ukryj panel",
-      "flask.badge": "Flask",
-      "flask.sub": "Wersja serwerowa — wpisujesz ścieżkę do folderu lub pliku .csv, serwer parsuje i strumieniuje wyniki na żywo.",
-      "flask.placeholder": "Ścieżka do folderu z logami albo do pojedynczego pliku .csv",
-      "flask.btn.analyze": "Analizuj",
-      "flask.btn.stop": "Stop",
-      "flask.modal.title": "Ścieżka gotowa do analizy",
-      "flask.modal.hint": "Wybór obszaru: serwer pomija pliki bez ani jednego punktu w prostokącie.",
-      "flask.status.initial": "Wpisz ścieżkę do folderu albo pliku .csv i kliknij „Analizuj”.",
-      "flask.status.pickFirst": "Najpierw wpisz ścieżkę.",
-      "flask.status.connect": "Łączę…",
-      "flask.status.connectArea": "Łączę… (filtr obszaru aktywny)",
-      "flask.status.cancelled": "Anulowano. Wpisz ścieżkę i kliknij „Analizuj”.",
-      "flask.status.stopped": "Zatrzymano.",
-      "flask.status.folder": "Folder: {folder}. Plików: {total}{scope}.",
-      "flask.status.scopeArea": " (z filtrem obszaru)",
-      "flask.status.processed": "Przetworzono {done}/{total}.",
-      "flask.status.done": "Gotowe: {ok} plików z GPS, łącznie {pts} punktów (z {total}){skip}.",
-      "flask.status.doneSkip": ", pominięto poza obszarem: {n}",
-      "flask.browser.cwd": "{path} — {n} .csv tutaj",
-      "flask.browser.filesSection": "Pojedyncze pliki .csv (kliknij aby wybrać):",
-      "flask.hint.ballistics": "Zakłada upadek ROZBROJONEGO drona (silniki OFF). Symulacja liczona po stronie serwera.",
-    },
   };
 
   const STORAGE_KEY = "fpvfinder.lang";
@@ -276,9 +162,6 @@
     document.querySelectorAll("[data-i18n-title]").forEach((el) => {
       el.title = t(el.getAttribute("data-i18n-title"));
     });
-    document.querySelectorAll(".lang-btn").forEach((b) => {
-      b.classList.toggle("active", b.dataset.lang === current);
-    });
   }
 
   function set(lang) {
@@ -291,12 +174,7 @@
 
   current = detect();
 
-  document.addEventListener("DOMContentLoaded", () => {
-    apply();
-    document.querySelectorAll(".lang-btn").forEach((b) => {
-      b.addEventListener("click", () => set(b.dataset.lang));
-    });
-  });
+  document.addEventListener("DOMContentLoaded", apply);
 
   g.FpvI18n = { t, set, get: () => current };
 })(window);

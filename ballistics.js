@@ -1,5 +1,5 @@
-// Symulacja balistyczna upadku rozbrojonego drona (silniki OFF).
-// Port z analiza_upadku.py — wszystkie parametry jako argumenty (zero hardkodów).
+// Ballistic simulation of a disarmed drone falling (motors OFF).
+// Ported from the legacy crash-analysis script — every parameter is an argument (nothing hardcoded).
 
 (function (global) {
   "use strict";

@@ -1,6 +1,6 @@
-// Parser logów EdgeTX (i podobnych OpenTX-pochodnych) działający w przeglądarce.
-// Elastyczne wykrywanie kolumny GPS — pozycja kolumny zależy od konfiguracji
-// telemetrii u danego pilota, więc szukamy po nazwie a nie po indeksie.
+// Parser for EdgeTX (and similar OpenTX-derived) logs, running in the browser.
+// Flexible GPS column detection — the column position depends on each pilot's
+// telemetry setup, so we look the column up by name rather than by index.
 //
 // API: parseLogFile(file) -> Promise<Array<Point>>
 // Point: { time, date, lat, lon, alt, sats, gspd, hdg }
@@ -11,7 +11,7 @@
   const ENCODINGS = ["utf-8", "windows-1250", "iso-8859-1"];
   const PAIR_SEP = /[\s,;]+/;
 
-  // ---- Odczyt z fallbackiem kodowania ---------------------------------------
+  // ---- Reading with encoding fallback ---------------------------------------
 
   async function readFileText(file) {
     const buf = await file.arrayBuffer();
@@ -25,13 +25,13 @@
         // try next encoding
       }
     }
-    // Ostateczność: utf-8 z zamianą błędnych bajtów
+    // Last resort: utf-8 with invalid bytes replaced
     const dec = new TextDecoder("utf-8", { fatal: false });
     const text = dec.decode(buf);
     return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   }
 
-  // ---- Lekki parser CSV (obsługuje cudzysłowy i przecinki w polach) ---------
+  // ---- Lightweight CSV parser (handles quotes and commas inside fields) ----
 
   function parseCSVLine(line) {
     const out = [];
@@ -72,13 +72,13 @@
     return { fields, rows };
   }
 
-  // ---- Walidacja punktu ------------------------------------------------------
+  // ---- Point validation ------------------------------------------------------
 
   function isValidPair(lat, lon) {
     if (lat == null || lon == null || Number.isNaN(lat) || Number.isNaN(lon)) return false;
     if (lat < -90 || lat > 90) return false;
     if (lon < -180 || lon > 180) return false;
-    if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false; // brak fixa
+    if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false; // no GPS fix
     return true;
   }
 
@@ -102,7 +102,7 @@
     return Number.isNaN(v) ? null : v;
   }
 
-  // ---- Detekcja kolumn -------------------------------------------------------
+  // ---- Column detection ------------------------------------------------------
 
   function nameScoreGps(name) {
     const n = (name || "").toLowerCase();
@@ -152,7 +152,7 @@
     const info = { mode: null };
     if (!fields || fields.length === 0) return info;
 
-    // Tryb A: pojedyncza kolumna z 'lat lon'
+    // Mode A: a single column holding 'lat lon'
     const candidates = fields
       .map((n) => ({ score: nameScoreGps(n), name: n }))
       .filter((c) => c.score > 0)
@@ -167,7 +167,7 @@
       }
     }
 
-    // Tryb B: osobne lat/lon
+    // Mode B: separate lat/lon columns
     const latCol = fields.find(isLatName) || null;
     const lonCol = fields.find(isLonName) || null;
     let chosenSplit = null;
@@ -194,8 +194,9 @@
     return info;
   }
 
-  // Szacowanie dokładności GPS w metrach.
-  // Hdop (jeśli jest) * 5m to typowy CEP modułu GPS. Bez Hdop heurystyka po liczbie satelitów.
+  // Estimate GPS accuracy in metres.
+  // Hdop (when present) * 5 m is a typical CEP for a GPS module. Without Hdop,
+  // fall back to a heuristic based on the satellite count.
   function estimateAccuracy(hdopRaw, satsRaw) {
     const hdop = parseFloat(hdopRaw);
     if (!Number.isNaN(hdop) && hdop > 0) return hdop * 5;
@@ -209,7 +210,7 @@
     return null;
   }
 
-  // ---- Główne API ------------------------------------------------------------
+  // ---- Public API ------------------------------------------------------------
 
   function isLogFile(file) {
     const name = (file.name || "").toLowerCase();
@@ -255,7 +256,7 @@
         gspd: valOf(row, info.gspdCol),
         hdg: valOf(row, info.hdgCol),
         hdop: hdopRaw,
-        accuracy: estimateAccuracy(hdopRaw, satsRaw),  // metry, lub null
+        accuracy: estimateAccuracy(hdopRaw, satsRaw),  // metres, or null
       });
     }
     return points;
